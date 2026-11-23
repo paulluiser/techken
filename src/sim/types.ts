@@ -9,9 +9,10 @@ export const S = {
   WEAK: 26, WET: 27, UNHANDLED: 28, HOLD: 29, DRAIN_T: 30, HEAL_LEFT: 31, JOIN: 32,
   GUARD_BREAK: 33, HELD_ITEM: 34, BURN_T: 35, BURN_DPS: 36, RATE_LIMIT: 37,
   PERM_DMG: 38, PERM_ARMOR: 39, PERM_CHARGE: 40, PERM_COST: 41, PERM_MOT: 42, PERM_CDR: 43,
-  LAST_SKILL: 44, HURT_IDLE: 45, MERGE: 46,
+  LAST_SKILL: 44, HURT_IDLE: 45, MERGE: 46, REGEN_CUT: 47, AUTO_FULL: 48, TYPO: 49, NO_BURN_SLOW: 50, CRIT_NEXT: 51,
 } as const;
-export const N_ST = 47;
+export const N_ST = 52;
+export const N_RES = 24; // job resources; 12..23 are free for position history
 
 export interface Fighter {
   job: number; set: number;
@@ -25,7 +26,7 @@ export interface Fighter {
   cd: number[]; // 3 skill cooldowns (frames)
   cdPushed: number[]; // cooldown denial already applied (capped)
   st: number[]; // statuses, see S
-  res: number[]; // job-specific resources (8 slots)
+  res: number[]; // job-specific resources (N_RES slots)
 }
 
 /** Projectiles, summons, zones, walls, traps, platforms, anchors… */

@@ -16,7 +16,7 @@ function rng(seed: number) {
 
 interface Net { minDelay: number; maxDelay: number; loss: number }
 
-function play(net: Net, ticks: number, delays: [number, number], seed = 1) {
+function play(net: Net, ticks: number, delays: [number, number], seed = 1, cfg = CFG) {
   const r = rng(seed);
   let clock = 0;
   const now = () => clock;
@@ -27,8 +27,8 @@ function play(net: Net, ticks: number, delays: [number, number], seed = 1) {
     queues[1 - from].push({ at: clock + d * (1000 / 60), m: JSON.parse(JSON.stringify(m)) });
   };
   const sess = [
-    new RollbackSession({ me: 0, delay: delays[0], send: sendFrom(0), now, initial: initState(CFG) }),
-    new RollbackSession({ me: 1, delay: delays[1], send: sendFrom(1), now, initial: initState(CFG) }),
+    new RollbackSession({ me: 0, delay: delays[0], send: sendFrom(0), now, initial: initState(cfg) }),
+    new RollbackSession({ me: 1, delay: delays[1], send: sendFrom(1), now, initial: initState(cfg) }),
   ];
   // what each player actually pressed, by the frame it applies to
   const log: Map<number, number>[] = [new Map(), new Map()];
@@ -50,18 +50,18 @@ function play(net: Net, ticks: number, delays: [number, number], seed = 1) {
       if (sess[i].tick(inp) && !log[i].has(f + delays[i])) log[i].set(f + delays[i], inp);
     }
   }
-  return { sess, log };
+  return { sess, log, cfg };
 }
 
 /** Straight simulation (no rollback) to frame n with the inputs players really pressed. */
-function reference(log: Map<number, number>[], n: number) {
-  const s = initState(CFG);
+function reference(log: Map<number, number>[], n: number, cfg = CFG) {
+  const s = initState(cfg);
   for (let f = 0; f < n; f++) step(s, [log[0].get(f) ?? 0, log[1].get(f) ?? 0]);
   return checksum(s);
 }
 
-function expectMatchesReference(sess: RollbackSession[], log: Map<number, number>[]) {
-  for (const s of sess) expect(checksum(s.state)).toBe(reference(log, s.frame));
+function expectMatchesReference(sess: RollbackSession[], log: Map<number, number>[], cfg = CFG) {
+  for (const s of sess) expect(checksum(s.state)).toBe(reference(log, s.frame, cfg));
 }
 
 describe("rollback session", () => {
@@ -93,6 +93,15 @@ describe("rollback session", () => {
       const { sess, log } = play({ minDelay: 1, maxDelay: 12, loss: 0.2 }, 1500, [2, 2], seed);
       for (const s of sess) expect(s.stats.desync).toBe(false);
       expectMatchesReference(sess, log);
+    }
+  });
+
+  it("stays in sync for every job across random matchups on a lossy network", () => {
+    for (let n = 0; n < 17; n++) {
+      const cfg = { ...DEFAULT_CONFIG, jobs: [n, (n * 7 + 3) % 17] as [number, number], sets: [n % 2, (n >> 1) % 2] as [number, number], arena: n % 13, items: true, seed: 900 + n };
+      const { sess, log } = play({ minDelay: 2, maxDelay: 8, loss: 0.12 }, 1500, [2, 2], 500 + n, cfg);
+      for (const x of sess) expect(x.stats.desync).toBe(false);
+      expectMatchesReference(sess, log, cfg);
     }
   });
 });

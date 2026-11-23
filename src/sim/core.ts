@@ -146,6 +146,7 @@ export function dealDamage(s: State, a: number, t: number, base: number, h: Hit)
   }
 
   let dmg = base;
+  if (A && reactive && A.st[S.CRIT_NEXT] > 0) { h = { ...h, crit: true }; A.st[S.CRIT_NEXT]--; }
   if (reactive) {
     if (A) {
       dmg = pm(dmg, 1000 + A.st[S.PERM_DMG] * 80);
@@ -283,3 +284,47 @@ export function runBehavior(s: State, e: Entity): boolean {
   if (!fn) return --e.life > 0;
   return fn(s, e);
 }
+
+// ---------------- helpers for phase 2 jobs ----------------
+/** Shot from (x,y) aimed at (tx,ty). Integer math only (sqrt of an integer is exact-rounded IEEE). */
+export function aimShot(s: State, i: number, b: string, x: number, y: number, tx: number, ty: number, speed: number, dmg: number, life = 90, size = 10): Entity {
+  const dx = Math.trunc((tx - x) / 16), dy = Math.trunc((ty - y) / 16);
+  const len = Math.max(1, Math.trunc(Math.sqrt(dx * dx + dy * dy)));
+  return spawn(s, { k: K.PROJ, b, o: i, x, y, vx: Math.trunc((dx * speed) / len), vy: Math.trunc((dy * speed) / len), w: size, h: size, life, dmg });
+}
+
+/** Ring of 4 (x, y, hp) samples of fighter `who`, one every 45 frames, kept in holder.res[12..23]. */
+export function recordHistory(s: State, holder: Fighter, who: Fighter) {
+  if (s.frame % 45 !== 0) return;
+  for (let k = 12; k < 21; k++) holder.res[k] = holder.res[k + 3];
+  holder.res[21] = who.x; holder.res[22] = who.y; holder.res[23] = who.hp;
+}
+/** The oldest sample (~2.25–3 s ago), or null before the history fills. */
+export function oldestHistory(holder: Fighter): { x: number; y: number; hp: number } | null {
+  if (holder.res[12] === 0 && holder.res[13] === 0) return null;
+  return { x: holder.res[12], y: holder.res[13], hp: holder.res[14] };
+}
+
+/** Distance in px from fighter to the segment a-b (all sub-px inputs). */
+export function segDistPx(f: Fighter, ax: number, ay: number, bx: number, by: number): number {
+  const P = (n: number) => Math.trunc(n / SUB);
+  const x = P(f.x), y = P(f.y) - 16, x1 = P(ax), y1 = P(ay), x2 = P(bx), y2 = P(by);
+  const vx = x2 - x1, vy = y2 - y1, wx = x - x1, wy = y - y1;
+  const len2 = vx * vx + vy * vy;
+  let t = len2 === 0 ? 0 : Math.trunc(((wx * vx + wy * vy) * 1000) / len2);
+  t = clamp(t, 0, 1000);
+  const cx = x1 + Math.trunc((vx * t) / 1000), cy = y1 + Math.trunc((vy * t) / 1000);
+  const ex = x - cx, ey = y - cy;
+  return Math.trunc(Math.sqrt(ex * ex + ey * ey));
+}
+
+/** Basic-attack damage for a charge (used by copies like DevOps pods). */
+export function basicDmg(s: State, i: number, c: number): number {
+  const j = jobOf(s.f[i]), cf = chargeFull(s, i);
+  if (c < Math.trunc(cf / C.TAP_FRAC)) return j.tap;
+  return j.tap + Math.trunc(((j.full - j.tap) * min(c, cf)) / cf);
+}
+export const inFront = (f: Fighter, t: Fighter, rangePx: number, dyPx = 40) =>
+  (t.x - f.x) * f.facing > 0 && abs(t.x - f.x) <= px(rangePx) && abs(t.y - f.y) < px(dyPx);
+export const near = (f: Fighter, t: Fighter, rangePx: number, dyPx = 50) => abs(t.x - f.x) <= px(rangePx) && abs(t.y - f.y) < px(dyPx);
+export const inZone = (e: Entity, t: Fighter) => overlap(entBox(e), fighterBox(t));

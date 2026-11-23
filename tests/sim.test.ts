@@ -33,8 +33,8 @@ const cfg = (a: number, b: number, sa = 0, sb = 0, arena = 0, items = false): Ma
   ({ ...DEFAULT_CONFIG, jobs: [a, b], sets: [sa, sb], arena, items });
 
 describe("sim determinism", () => {
-  it("implements the 6 phase-1 jobs", () => {
-    expect(IMPL).toEqual([0, 2, 5, 7, 8, 16]);
+  it("implements all 17 jobs", () => {
+    expect(IMPL).toEqual([...Array(17).keys()]);
   });
 
   it("every job pairing, set and arena replays identically (with items and skills)", () => {

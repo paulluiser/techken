@@ -1,6 +1,6 @@
 # Techken
 
-**Build status:** see `ROADMAP.md`. Phase 1 is done: the combat engine (guard, skills, status caps, summons, projectiles, zones, all 14 items, all 13 arena layouts) and 6 jobs with both sets each (Software Engineer, QA, DBA, Cloud Engineer, Tech Support, Vibe Coder), playable vs CPU and online with a blind job/set pick.
+**Build status:** see `ROADMAP.md`. Phase 1 is done: the combat engine (guard, skills, status caps, summons, projectiles, zones, all 14 items, all 13 arena layouts) Phase 2 added the other 11 jobs, so **all 17 jobs × 2 sets (34 kits)** are playable vs CPU and online with a blind job/set pick.
 
 ## Online test (phase 0)
 

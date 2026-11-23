@@ -12,7 +12,7 @@ import {
 import { stepItems, throwInvite } from "./items";
 import { IN_ATTACK, IN_DASH, IN_DOWN, IN_GUARD, IN_LEFT, IN_RIGHT, IN_SKILLS, IN_UP, type Input } from "./input";
 import { BEH } from "./registry";
-import { K, N_ST, S, type Entity, type Fighter, type MatchConfig, type State } from "./types";
+import { K, N_RES, N_ST, S, type Entity, type Fighter, type MatchConfig, type State } from "./types";
 
 export type { State, Fighter, Entity, MatchConfig } from "./types";
 
@@ -32,7 +32,7 @@ function newFighter(cfg: MatchConfig, i: 0 | 1): Fighter {
     atk: 0, atkCharge: 0, atkHit: 0, recovery: 0,
     hitstun: 0, dash: 0, dashDir: 1, dashCd: 0, iframes: 0,
     dropThrough: 0, prevInput: 0, flash: 0, lastDmg: 0,
-    cd: [0, 0, 0], cdPushed: [0, 0, 0], st: new Array(N_ST).fill(0), res: new Array(8).fill(0),
+    cd: [0, 0, 0], cdPushed: [0, 0, 0], st: new Array(N_ST).fill(0), res: new Array(N_RES).fill(0),
   };
   f.jumpsLeft = jobOf(f).jumps - 1;
   return f;
@@ -130,7 +130,8 @@ function tickStatuses(s: State, i: number) {
   } else {
     f.motIdle++;
     if (f.motIdle > C.MOT_REGEN_DELAY && f.st[S.HOLD] === 0) {
-      const regen = f.st[S.REGEN_BUF_T] > 0 ? pm(C.MOT_REGEN, 1000 + f.st[S.REGEN_BUF]) : C.MOT_REGEN;
+      let regen = f.st[S.REGEN_BUF_T] > 0 ? pm(C.MOT_REGEN, 1000 + f.st[S.REGEN_BUF]) : C.MOT_REGEN;
+      if (f.st[S.REGEN_CUT] > 0) regen = pm(regen, 1000 - f.st[S.REGEN_CUT] * 10);
       f.mot = min(motMax(f), f.mot + regen);
     }
   }
@@ -141,18 +142,23 @@ function tryCast(s: State, i: number, k: number) {
   if (!sk || f.cd[k] > 0 || f.st[S.SILENCE] > 0 || f.burnout > 0 || f.st[S.INVULN] > 0 || f.st[S.RATE_LIMIT] > 0) return;
   if (set.canCast && !set.canCast(s, i, k)) return;
   const cost = pm(sk.cost, 1000 - f.st[S.PERM_COST] * 100) + (f.st[S.HOLD] > 0 ? 1000 : 0);
-  if (!sk.cast(s, i, 1000)) return;
+  const typo = f.st[S.TYPO] > 0; // Technical Writer's Typo: this skill misfires the wrong way
+  if (typo) { f.st[S.TYPO] = 0; f.facing = -f.facing; }
+  const ok = sk.cast(s, i, 1000);
+  if (typo) f.facing = -f.facing;
+  if (!ok) return;
   if (cost > 0) spendMot(f, cost); // Crunch Cast: allowed even if you can't afford it
-  if (f.st[S.FREE_SKILLS] > 0) { f.st[S.FREE_SKILLS]--; f.cd[k] = 0; } else f.cd[k] = pm(sk.cd, 1000 - f.st[S.PERM_CDR] * 100);
+  if (f.st[S.FREE_SKILLS] > 0) { f.st[S.FREE_SKILLS]--; f.cd[k] = 0; } else f.cd[k] = pm(pm(sk.cd, 1000 - f.st[S.PERM_CDR] * 100), set.cdMul?.(s, i) ?? 1000);
   f.st[S.LAST_SKILL] = k + 1;
   f.st[S.CAST] = max(f.st[S.CAST], C.CAST_LOCK);
   set.afterCast?.(s, i, k);
+  setOf(s.f[1 - i]).onEnemyCast?.(s, 1 - i, k);
 }
 
 function moveSpeed(f: Fighter): number {
   let v = jobOf(f).walk;
   if (f.charging) v = pm(v, 600);
-  if (f.burnout > 0) v = v >> 1;
+  if (f.burnout > 0 && f.st[S.NO_BURN_SLOW] === 0) v = v >> 1;
   if (f.st[S.SPD_BUF_T] > 0) v = pm(v, 1000 + f.st[S.SPD_BUF]);
   if (f.st[S.CRASH_T] > 0 && f.st[S.CRASH_T] <= 120) v = pm(v, 800);
   if (f.st[S.SLOW_T] > 0) v = pm(v, 1000 - f.st[S.SLOW_PCT] * 10);
@@ -172,7 +178,7 @@ function landOn(s: State, f: Fighter, prevY: number) {
     if (f.x >= px(p.x1) && f.x <= px(p.x2) && prevY <= py && f.y >= py) { land(py); return; }
   }
   for (const e of s.ents) {
-    if (e.k !== K.PLATFORM || e.hp <= 0) continue;
+    if ((e.k !== K.PLATFORM && e.k !== K.WALL) || e.hp <= 0) continue;
     const py = e.y - px(e.h), hw = px(e.w) >> 1;
     if (f.x >= e.x - hw && f.x <= e.x + hw && prevY <= py && f.y >= py) { land(py); return; }
   }
@@ -224,6 +230,7 @@ function stepFighter(s: State, i: number, raw: Input) {
         f.charge++;
         if (!(inp & IN_ATTACK) || f.charge >= C.CHARGE_MAX) {
           f.atk = 1; f.atkCharge = f.charge; f.atkHit = 0; f.charging = 0; f.charge = 0;
+          if (f.st[S.AUTO_FULL] > 0) { f.st[S.AUTO_FULL]--; f.atkCharge = Math.max(f.atkCharge, chargeFull(s, i)); }
         }
       }
       if (!f.charging && f.atk === 0) for (let k = 0; k < 3; k++) if (pressed & IN_SKILLS[k]) tryCast(s, i, k);
@@ -257,11 +264,16 @@ function stepFighter(s: State, i: number, raw: Input) {
     f.vy = min(C.MAX_FALL, f.vy + C.GRAVITY);
     if (job.glide && (inp & IN_UP) && f.vy > C.GLIDE_FALL) f.vy = C.GLIDE_FALL;
   }
-  const prevY = f.y;
+  const prevY = f.y, prevX = f.x;
   f.x += f.vx;
   f.y += f.vy;
   const half = px(10);
   f.x = Math.max(px(C.WALL_L) + half, Math.min(px(C.WALL_R) - half, f.x));
+  for (const e of s.ents) {
+    if (e.k !== K.WALL || e.o === i || e.hp <= 0) continue;
+    const wb = entBox(e), fb = fighterBox(f);
+    if (overlap(fb, wb) && prevY > wb.y1 + px(4)) { f.x = prevX; f.vx = 0; }
+  }
   landOn(s, f, prevY);
   f.prevInput = raw;
 }
@@ -335,8 +347,8 @@ function stepEntities(s: State) {
 }
 
 function resetRound(s: State) {
-  initFighters(s);
   s.ents = []; s.items = []; s.itemT = C.ITEM_FIRST;
+  initFighters(s);
   s.timer = C.ROUND_FRAMES; s.phase = PHASE_FIGHT; s.phaseT = 0; s.roundWinner = -1;
 }
 

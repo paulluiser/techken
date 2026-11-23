@@ -43,6 +43,8 @@ export interface SetDef {
   chargeMul?(s: State, i: number): number; // permille of charge time
   canCast?(s: State, i: number, k: number): boolean;
   afterCast?(s: State, i: number, k: number): void;
+  onEnemyCast?(s: State, i: number, k: number): void;
+  cdMul?(s: State, i: number): number; // permille of cooldowns
 }
 
 export interface JobDef {
