@@ -14,7 +14,7 @@ function falloff(s: State, i: number, t: number) { // 100 % close, 70 % at max r
 registerJob({
   idx: 4, id: "na", name: "Network Admin", color: 0x39ff7a,
   walk: 384, jumps: 2, chargeFull: 60, tap: 20, full: 70, reach: 20, weight: 2,
-  ranged: { speed: px(6), life: 42 },
+  ranged: { speed: px(6), life: 36 },
   sets: [
     {
       name: "Full Bars", passive: "Access Point",

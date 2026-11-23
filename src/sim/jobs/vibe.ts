@@ -95,7 +95,7 @@ const SHIP_B = tokenSet({
 registerJob({
   idx: 16, id: "vc", name: "Vibe Coder", color: 0xff6ad5,
   walk: 614, jumps: 2, chargeFull: 36, tap: 20, full: 60, reach: 20, weight: 2,
-  ranged: { speed: px(6), life: 45 },
+  ranged: { speed: px(5), life: 34 },
   sets: [PROMPT_A, SHIP_B],
 });
 

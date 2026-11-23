@@ -10,7 +10,7 @@ const variance = (s: State) => 800 + rndInt(s, 401); // ±20 %
 registerJob({
   idx: 10, id: "ds", name: "Data Scientist", color: 0x1d6f73,
   walk: 512, jumps: 2, chargeFull: 48, tap: 15, full: 60, reach: 20, weight: 2,
-  ranged: { speed: px(5), life: 48 },
+  ranged: { speed: px(5), life: 34 },
   sets: [
     {
       // res: 0 data points (max 10)

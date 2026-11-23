@@ -15,7 +15,7 @@ function escalate(e: Entity) { e.b = "ts.manager"; e.hp = 250; e.w = 18; e.h = 3
 registerJob({
   idx: 8, id: "ts", name: "Technical Support", color: 0xf2d21b,
   walk: 512, jumps: 2, chargeFull: 48, tap: 20, full: 65, reach: 20, weight: 3,
-  ranged: { speed: px(5), life: 36 },
+  ranged: { speed: px(5), life: 34 },
   sets: [
     {
       // res: 0 CSAT stars, 1 free escalation ready, 2 refund cost of this cast

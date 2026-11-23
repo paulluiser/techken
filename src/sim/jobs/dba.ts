@@ -6,7 +6,7 @@ import { K, S } from "../types";
 
 registerJob({
   idx: 5, id: "db", name: "Database Admin", color: 0xc9a46a,
-  walk: 307, jumps: 1, chargeFull: 78, tap: 35, full: 110, reach: 30, weight: 5, superArmor: true,
+  walk: 384, jumps: 1, chargeFull: 66, tap: 35, full: 110, reach: 30, weight: 5, superArmor: true,
   sets: [
     {
       // res: 0 HP snapshot, 1 snapshot timer, 2 "just pulled" timer

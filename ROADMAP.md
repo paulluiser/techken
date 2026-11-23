@@ -15,9 +15,9 @@ RNG in the state), so rollback netcode keeps working as content is added.
 | 2 | **The other 11 jobs × 2 sets**: Mobile Dev, System Analyst, Network Admin, DevOps, Cybersecurity, Data Scientist, AI/ML, Business Analyst, PM, UI/UX, Technical Writer | ✅ done |
 | 3 | **Arena hazards** (13), Overtime, double-KO tiebreaker, aimed (hold) targeting for "anywhere" skills | ✅ done |
 | 4 | **TechkenOS menus**: Desktop, Employee Directory (blind pick, palettes), Meeting Room, VS screen, Post-Mortem, Control Panel (rebinding, touch layout editor), Swag Drawer | ✅ done |
-| 5 | **CPU AI**: 5 difficulty levels and per-job playbooks. Headless balance runner (CPU vs CPU win rates) | ⏳ |
+| 5 | **CPU AI**: 5 difficulty levels and per-job playbooks. Headless balance runner (CPU vs CPU win rates) | ✅ done: baseline in `design/balance-report.md` |
 | 6 | **Art**: chibi pixel sprites for 17 jobs (generated in the approved style), 5-layer backgrounds for 13 arenas, item icons, effects, portraits | ⏳ |
 | 7 | **Audio**: chip synth engine, 13 arena themes with Crunch stems, 17 job motifs, about 150 SFX, announcer text and lines, mixing rules, rollback-safe sound events | ⏳ |
 | 8 | **Single player**: Career ladder (rivals, Inbox Zero bonus stage, Legacy System and The Board bosses, scoring, endings), Training Room | ⏳ |
 | 9 | **Saves**: browser save, cosmetic unlocks, temporary names, transfer code and QR (`/api/transfer`) | ⏳ |
-| 10 | **Polish**: PWA, accessibility options, performance on phones, balance pass from the CPU runner | ⏳ |
+| 10 | **Polish**: PWA, accessibility options, performance on phones, balance pass from the CPU runner (start with the outliers in `design/balance-report.md`: Tech Support A, Vibe Coder A/B high; DevOps B, Cyber B, QA A low) | ⏳ |

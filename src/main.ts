@@ -14,6 +14,7 @@ import { PROTOCOL_VERSION, type CtrlMsg } from "./net/protocol";
 import { createLobby, fetchOffer, getIceServers, LobbyError, normalizeCode, postAnswer, waitForAnswer } from "./net/lobby-client";
 import { ACTIONS, keyLabel, loadSettings, randomGuest, resetSettings, saveSettings, validName, type ActionId } from "./ui/settings";
 import { META, PALETTES, paletteColor, paletteUnlocked } from "./ui/jobmeta";
+import { LEVELS } from "./ai/cpu";
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
 const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -162,7 +163,7 @@ function openDirectory(mode: PickMode, ready?: (p: Pick) => void) {
     const optsHtml = mode === "guest" ? "" : `<div class="row opts">
         <label>Arena <select id="o-arena">${ARENAS.map((a, n) => `<option value="${n}" ${n === settings.arena ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label>
         ${mode === "practice" ? `<label>CPU <select id="o-cpu"><option value="-1">Random</option>${implementedJobs().map((n) => `<option value="${n}" ${n === settings.cpu ? "selected" : ""}>${esc(JOB_NAMES[n])}</option>`).join("")}</select></label>
-        <label>Difficulty <select disabled><option>Mid-level (phase 5)</option></select></label>` : ""}
+        <label>Difficulty <select id="o-lvl">${LEVELS.map((l, n) => `<option value="${n + 1}" ${n + 1 === settings.cpuLevel ? "selected" : ""}>${n + 1} · ${l.name}</option>`).join("")}</select></label>` : ""}
         <label><input type="checkbox" id="o-items" ${settings.items ? "checked" : ""}> Items</label>
         <label><input type="checkbox" id="o-haz" ${settings.hazards ? "checked" : ""}> Hazards</label>
       </div>`;
@@ -196,6 +197,7 @@ function openDirectory(mode: PickMode, ready?: (p: Pick) => void) {
     const sel = (id: string) => root.querySelector<HTMLSelectElement>(id);
     sel("#o-arena")?.addEventListener("change", (e) => { settings.arena = Number((e.target as HTMLSelectElement).value); save(); });
     sel("#o-cpu")?.addEventListener("change", (e) => { settings.cpu = Number((e.target as HTMLSelectElement).value); save(); render(); });
+    sel("#o-lvl")?.addEventListener("change", (e) => { settings.cpuLevel = Number((e.target as HTMLSelectElement).value); save(); });
     root.querySelector<HTMLInputElement>("#o-items")?.addEventListener("change", (e) => { settings.items = (e.target as HTMLInputElement).checked; save(); });
     root.querySelector<HTMLInputElement>("#o-haz")?.addEventListener("change", (e) => { settings.hazards = (e.target as HTMLInputElement).checked; save(); });
     $("#ready", root).addEventListener("click", () => {
@@ -217,9 +219,10 @@ function startPractice(p: Pick) {
   const cfg: MatchConfig = { ...DEFAULT_CONFIG, jobs: [p.job, cj], sets: [p.set, Math.floor(Math.random() * 2)], arena: settings.arena, items: settings.items, hazards: settings.hazards, seed: (Math.random() * 2 ** 31) | 0 };
   const cpuPal = cj === p.job && p.palette === 0 ? 1 : 0;
   lastPractice = p;
-  showVS(cfg, [settings.name, "CPU"], [p.palette, cpuPal], () => {
-    driver.startPractice(cfg);
-    driver.view = { names: [settings.name, "CPU"], palettes: [p.palette, cpuPal] };
+  const cpuName = `CPU · ${LEVELS[settings.cpuLevel - 1].name}`;
+  showVS(cfg, [settings.name, cpuName], [p.palette, cpuPal], () => {
+    driver.startPractice(cfg, settings.cpuLevel);
+    driver.view = { names: [settings.name, cpuName], palettes: [p.palette, cpuPal] };
     playing();
   });
 }

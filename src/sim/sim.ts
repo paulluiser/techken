@@ -309,8 +309,9 @@ function stepFighter(s: State, i: number, raw: Input) {
 
 function basicDamage(s: State, i: number, c: number): { dmg: number; full: boolean } {
   const j = jobOf(s.f[i]), cf = chargeFull(s, i);
-  if (c < Math.trunc(cf / C.TAP_FRAC)) return { dmg: j.tap, full: false };
-  return { dmg: j.tap + Math.trunc(((j.full - j.tap) * min(c, cf)) / cf), full: c >= cf };
+  const r = j.ranged ? 750 : 1000; // shots trade damage for safety
+  if (c < Math.trunc(cf / C.TAP_FRAC)) return { dmg: pm(j.tap, r), full: false };
+  return { dmg: pm(j.tap + Math.trunc(((j.full - j.tap) * min(c, cf)) / cf), r), full: c >= cf };
 }
 function basicHit(s: State, i: number, full: boolean, c: number) {
   const f = s.f[i], cf = chargeFull(s, i), r = min(c, cf);

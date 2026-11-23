@@ -1,7 +1,6 @@
 // Runs the simulation at a fixed 60 Hz, either locally (attract/practice) or through the
 // rollback session (online). Rendering reads `state` and never changes it.
-import { SUB } from "../sim/constants";
-import { IN_ATTACK, IN_GUARD, IN_LEFT, IN_RIGHT, IN_S1, IN_S2, IN_S3, IN_UP } from "../sim/input";
+import { cpuInput, newCpu, type CpuMem } from "../ai/cpu";
 import { JOBS } from "../sim/registry";
 import { DEFAULT_CONFIG, initState, step, type MatchConfig, type State } from "../sim/sim";
 import { RollbackSession } from "../net/rollback";
@@ -13,22 +12,6 @@ export type Mode = "attract" | "practice" | "online";
 export interface InputReader { read(): number }
 
 export const implementedJobs = () => JOBS.map((j, k) => (j ? k : -1)).filter((k) => k >= 0);
-
-/** Simple CPU for practice/attract: walks in, charges, uses skills now and then. */
-export function dummyBot(s: State, who: 0 | 1): number {
-  const me = s.f[who], you = s.f[1 - who];
-  const dx = you.x - me.x, adx = dx > 0 ? dx : -dx;
-  const t = (s.frame + who * 70) % 240;
-  let b = 0;
-  if (adx > 44 * SUB && t < 150) b |= dx > 0 ? IN_RIGHT : IN_LEFT;
-  else if (t < 50) b |= IN_ATTACK;
-  if (t === 100 || t === 101) b |= IN_UP;
-  if (t === 60) b |= IN_S1;
-  if (t === 140) b |= IN_S2;
-  if (t === 200) b |= IN_S3;
-  if (t > 210 && you.charging) b |= IN_GUARD;
-  return b;
-}
 
 export function randomConfig(arena?: number): MatchConfig {
   const jobs = implementedJobs();
@@ -51,6 +34,8 @@ export class Driver {
   stalls = 0;
   lastStallAt = 0;
   paused = false;
+  cpuLevel = 3;
+  private cpu: [CpuMem, CpuMem] = [newCpu(1), newCpu(2)];
   epoch = 0;
   /** Cosmetic, not part of the sim: names and palettes for the renderer. */
   view = { names: ["", ""] as [string, string], palettes: [0, 0] as [number, number] };
@@ -62,8 +47,8 @@ export class Driver {
 
   get state(): State { return this.mode === "online" && this.session ? this.session.state : this.local; }
 
-  startAttract() { this.stopOnline(); this.mode = "attract"; this.local = initState(randomConfig()); this.acc = 0; }
-  startPractice(cfg: MatchConfig) { this.stopOnline(); this.mode = "practice"; this.me = 0; this.local = initState(cfg); this.acc = 0; }
+  startAttract() { this.stopOnline(); this.mode = "attract"; this.local = initState(randomConfig()); this.acc = 0; this.cpu = [newCpu(Date.now()), newCpu(Date.now() + 1)]; }
+  startPractice(cfg: MatchConfig, level = this.cpuLevel) { this.stopOnline(); this.mode = "practice"; this.me = 0; this.cpuLevel = level; this.local = initState(cfg); this.acc = 0; this.cpu = [newCpu(cfg.seed), newCpu(cfg.seed ^ 0x5bd1e995)]; }
   startOnline(link: PeerLink, me: 0 | 1, delay: number, cfg: MatchConfig) {
     this.mode = "online";
     this.me = me;
@@ -97,7 +82,7 @@ export class Driver {
       if (!this.session.tick(this.input.read())) { this.stalls++; this.lastStallAt = performance.now(); }
       return;
     }
-    const p1 = this.mode === "practice" ? this.input.read() : dummyBot(this.local, 0);
-    step(this.local, [p1, dummyBot(this.local, 1)]);
+    const p1 = this.mode === "practice" ? this.input.read() : cpuInput(this.local, 0, 3, this.cpu[0]);
+    step(this.local, [p1, cpuInput(this.local, 1, this.mode === "practice" ? this.cpuLevel : 3, this.cpu[1])]);
   }
 }

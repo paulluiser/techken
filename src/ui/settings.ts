@@ -20,7 +20,7 @@ export interface Settings {
   // online / test
   delay: number; lag: number; jitter: number; loss: number; relay: boolean; auto: boolean; debug: boolean;
   // last picks
-  job: number; set: number; palette: number; arena: number; cpu: number; items: boolean; hazards: boolean;
+  job: number; set: number; palette: number; arena: number; cpu: number; cpuLevel: number; items: boolean; hazards: boolean;
   // controls
   keys: Record<ActionId, string[]>;
   touch: { leftHanded: boolean; size: number; opacity: number; lx: number; ly: number; rx: number; ry: number };
@@ -36,7 +36,7 @@ const defaultKeys = () => Object.fromEntries(ACTIONS.map((a) => [a.id, [...a.key
 export const DEFAULTS: Settings = {
   name: "",
   delay: 2, lag: 0, jitter: 0, loss: 0, relay: false, auto: false, debug: false,
-  job: 0, set: 0, palette: 0, arena: 0, cpu: -1, items: true, hazards: true,
+  job: 0, set: 0, palette: 0, arena: 0, cpu: -1, cpuLevel: 3, items: true, hazards: true,
   keys: defaultKeys(),
   touch: { leftHanded: false, size: 100, opacity: 100, lx: 0, ly: 0, rx: 0, ry: 0 },
   vol: { master: 80, music: 70, sfx: 80, announcer: 80 }, mono: false, muffle: true,

@@ -9,7 +9,7 @@ const cx = (x: number) => clamp(x, px(WALL_L + 10), px(WALL_R - 10));
 registerJob({
   idx: 15, id: "tw", name: "Technical Writer", color: 0x1a1a1a,
   walk: 512, jumps: 2, chargeFull: 48, tap: 20, full: 65, reach: 20, weight: 2,
-  ranged: { speed: px(5), life: 44 },
+  ranged: { speed: px(5), life: 34 },
   sets: [
     {
       // res: 0 documented skills bitmask
