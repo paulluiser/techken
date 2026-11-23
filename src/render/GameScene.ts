@@ -10,6 +10,9 @@ import { PHASE_FIGHT, PHASE_MATCH_END, PHASE_ROUND_END, type State } from "../si
 import { ENV, K, S } from "../sim/types";
 import { OT_FRAMES } from "../sim/sim";
 import type { Driver } from "../game/driver";
+import { paletteColor } from "../ui/jobmeta";
+
+export interface RenderOpts { dmgNumbers: boolean; reduceFlash: boolean; colorblind: boolean }
 
 const FONT = '"Press Start 2P", monospace';
 const P = (n: number) => Math.round(n / C.SUB);
@@ -30,7 +33,7 @@ export class GameScene extends Phaser.Scene {
   private floaters: Floater[] = [];
   private lastHit = [0, 0];
 
-  constructor(private driver: Driver) { super("game"); }
+  constructor(private driver: Driver, private opts: () => RenderOpts) { super("game"); }
 
   create() {
     this.g = this.add.graphics();
@@ -122,11 +125,11 @@ export class GameScene extends Phaser.Scene {
     // fighters
     const you = this.driver.mode === "attract" ? -1 : this.driver.me;
     for (let i = 0; i < 2; i++) {
-      const f = s.f[i], job = jobOf(f);
+      const f = s.f[i], job = jobOf(f), o = this.opts();
       const x = P(f.x), y = P(f.y), bh = 30 + job.weight * 2;
-      let col = job.color;
+      let col = paletteColor(job.color, this.driver.view.palettes[i]);
       if (f.burnout > 0 || f.st[S.RATE_LIMIT] > 0) col = 0x6a6a7a;
-      if (f.flash > 0 && f.flash % 2 === 0) col = 0xffffff;
+      if (!o.reduceFlash && f.flash > 0 && f.flash % 2 === 0) col = 0xffffff;
       const alpha = f.iframes > 0 || f.st[S.INVULN] > 0 ? 0.5 : 1;
       if (f.dash > 0) { g.fillStyle(col, 0.22); g.fillRect(x - f.dashDir * 14 - 10, y - bh, 20, bh); }
       if (f.st[S.SHIELD] > 0) { g.fillStyle(0x59d3e8, 0.35); g.fillRect(x - 13, y - bh - 3, 26, bh + 3); }
@@ -155,7 +158,7 @@ export class GameScene extends Phaser.Scene {
       else if (f.charging && f.charge >= chargeFull(s, i)) label = "FULL!";
       tag.setText(label);
       tag.setColor(f.burnout > 0 ? "#c6c3d2" : label === "YOU" ? "#ffffff" : "#ffe066");
-      if (f.flash === 6 && this.lastHit[i] !== s.frame && f.lastDmg > 0) {
+      if (o.dmgNumbers && f.flash === 6 && this.lastHit[i] !== s.frame && f.lastDmg > 0) {
         this.lastHit[i] = s.frame;
         const big = f.lastDmg >= 70;
         const t = this.add.text(x, y - bh - 4, String(f.lastDmg), { fontFamily: FONT, fontSize: big ? "16px" : "8px", color: big ? "#ffe066" : "#ffffff", stroke: "#1b1630", strokeThickness: 3 }).setOrigin(0.5, 1);
@@ -187,7 +190,7 @@ export class GameScene extends Phaser.Scene {
     // darkness: Server Room outage, Hackathon lights dimming
     if (s.cfg.hazards && arena.id === "servers" && s.hz[1] > 0) { g.fillStyle(0x000000, 0.82); g.fillRect(0, 0, C.W, C.H); }
     if (s.cfg.hazards && arena.id === "hackathon") { g.fillStyle(0x000000, Math.min(0.55, (1 - s.timer / C.ROUND_FRAMES) * 0.6)); g.fillRect(0, 0, C.W, C.H); }
-    if (s.cfg.hazards && arena.id === "warroom" && s.hz[1] > 0 && (s.frame >> 3) & 1) { g.fillStyle(0xff0000, 0.18); g.fillRect(0, 0, C.W, C.H); }
+    if (!this.opts().reduceFlash && s.cfg.hazards && arena.id === "warroom" && s.hz[1] > 0 && (s.frame >> 3) & 1) { g.fillStyle(0xff0000, 0.18); g.fillRect(0, 0, C.W, C.H); }
 
     // HUD
     for (let i = 0; i < 2; i++) {
@@ -199,7 +202,7 @@ export class GameScene extends Phaser.Scene {
         const fw = Math.max(0, Math.round(w * Math.min(1, frac)));
         g.fillStyle(fill); g.fillRect(rtl ? bx + w - fw : bx, y, fw, h);
       };
-      bar(15, 140, 6, f.hp / C.HP_MAX, 0x5cb043, 0x3a1f2e);
+      bar(15, 140, 6, f.hp / C.HP_MAX, this.opts().colorblind ? 0x3b8bff : 0x5cb043, 0x3a1f2e);
       if (f.st[S.SHIELD] > 0) bar(15, Math.min(140, f.st[S.SHIELD]), 2, 1, 0x59d3e8, 0x59d3e8);
       bar(24, 100, 3, f.mot / motMax(f), f.burnout > 0 ? 0x66637a : 0xffb03a, 0x2a2340);
       if (job.id === "vc") bar(29, 70, 2, f.res[0] / 10000, f.st[S.RATE_LIMIT] > 0 ? 0x66637a : 0x26f0e0, 0x2a2340);
@@ -208,7 +211,8 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(0x1b1630); g.fillRect(bx, 3, 6, 6);
         g.fillStyle(s.wins[i] > k ? job.color : 0x3d3a4a); g.fillRect(bx + 1, 4, 4, 4);
       }
-      const who = this.driver.mode === "attract" ? "CPU" : i === you ? "YOU" : this.driver.mode === "practice" ? "CPU" : `P${i + 1}`;
+      const nm = this.driver.view.names[i];
+      const who = this.driver.mode === "attract" ? "CPU" : nm ? nm.toUpperCase() : i === you ? "YOU" : this.driver.mode === "practice" ? "CPU" : `P${i + 1}`;
       this.tName[i].setText(`${who} · ${JOB_CODES[f.job]} ${"AB"[f.set]}`);
       // skill slots: your own always; the opponent's only if you're a QA Analyst (or in attract)
       const showOpp = you === -1 || (you >= 0 && jobOf(s.f[you]).id === "qa");
@@ -235,7 +239,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (s.phase === PHASE_MATCH_END) {
       banner = s.matchWinner === 2 ? "DRAW" : you === -1 ? `P${s.matchWinner + 1} WINS` : s.matchWinner === you ? "YOU WIN!" : "YOU LOSE";
-      sub = "NEW MATCH SOON";
+      sub = this.driver.mode === "attract" ? "NEW MATCH SOON" : "";
     }
     this.tBanner.setText(banner);
     this.tSub.setText(sub);

@@ -136,6 +136,7 @@ export function dealDamage(s: State, a: number, t: number, base: number, h: Hit)
   const A = a >= 0 ? s.f[a] : null;
   if (T.hp <= 0 || s.phase !== 0 || base <= 0) return 0;
   const reactive = h.kind !== "dot" && h.kind !== "mirror";
+  const wasStunned = T.hitstun > 0 || T.st[S.STUN] > 0;
   if (reactive && (T.st[S.INVULN] > 0 || (T.iframes > 0 && h.kind !== "env"))) return 0;
 
   // finally { } counter stance
@@ -188,7 +189,15 @@ export function dealDamage(s: State, a: number, t: number, base: number, h: Hit)
   }
   dmg = max(0, dmg);
   T.hp -= dmg;
-  if (dmg > 0) T.lastDmg = dmg;
+  if (dmg > 0) {
+    T.lastDmg = dmg;
+    s.stats[t][6] += dmg; // ST.ROUND_TAKEN
+    if (a >= 0) {
+      const st = s.stats[a];
+      st[0] += dmg; // ST.DMG
+      if (reactive) { st[5] = wasStunned ? st[5] + 1 : 1; if (st[5] > st[1]) st[1] = st[5]; } // combo
+    }
+  }
   if (reactive) { T.flash = 6; T.st[S.HURT_IDLE] = 0; }
   if (h.kind === "basic" && A) { addMot(A, C.MOT_ON_HIT); addMot(T, C.MOT_ON_HURT); }
 

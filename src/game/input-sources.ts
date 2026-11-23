@@ -1,32 +1,29 @@
 import { IN_ATTACK, IN_DASH, IN_DOWN, IN_GUARD, IN_LEFT, IN_RIGHT, IN_S1, IN_S2, IN_S3, IN_UP } from "../sim/input";
+import { ACTIONS, type Settings } from "../ui/settings";
 
-// GDD 7.1: A/D move, W/Space jump, S drop, J attack, K guard, L dash, U/I/O skills
-const KEYMAP: Record<string, number> = {
-  ArrowLeft: IN_LEFT, KeyA: IN_LEFT,
-  ArrowRight: IN_RIGHT, KeyD: IN_RIGHT,
-  ArrowUp: IN_UP, KeyW: IN_UP, Space: IN_UP,
-  ArrowDown: IN_DOWN, KeyS: IN_DOWN,
-  KeyJ: IN_ATTACK,
-  KeyK: IN_GUARD,
-  KeyL: IN_DASH, ShiftLeft: IN_DASH, ShiftRight: IN_DASH,
-  KeyU: IN_S1, KeyI: IN_S2, KeyO: IN_S3,
-};
-
+/** Keyboard with rebindable keys (Control Panel → Controls). */
 export class Keyboard {
   private down = new Set<string>();
+  private map: Record<string, number> = {};
   enabled = true;
-  constructor() {
+  constructor(private settings: () => Settings) {
+    this.rebuild();
     addEventListener("keydown", (e) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA")) return;
-      if (e.code in KEYMAP) { this.down.add(e.code); if (this.enabled) e.preventDefault(); }
+      if (e.code in this.map) { this.down.add(e.code); if (this.enabled) e.preventDefault(); }
     });
     addEventListener("keyup", (e) => this.down.delete(e.code));
     addEventListener("blur", () => this.down.clear());
   }
+  rebuild() {
+    this.map = {};
+    const keys = this.settings().keys;
+    for (const a of ACTIONS) for (const k of keys[a.id] ?? []) this.map[k] = (this.map[k] ?? 0) | a.bit;
+  }
   bits(): number {
     let b = 0;
-    for (const k of this.down) b |= KEYMAP[k] ?? 0;
+    for (const k of this.down) b |= this.map[k] ?? 0;
     return b;
   }
 }
@@ -34,10 +31,12 @@ export class Keyboard {
 /** On-screen buttons: any element with data-bit inside the container. Multi-touch safe. */
 export class TouchPad {
   private held = new Map<number, number>(); // pointerId -> bit
+  editing = false;
   constructor(root: HTMLElement) {
     for (const el of root.querySelectorAll<HTMLElement>("[data-bit]")) {
       const bit = Number(el.dataset.bit);
       el.addEventListener("pointerdown", (e) => {
+        if (this.editing) return;
         e.preventDefault();
         el.setPointerCapture?.(e.pointerId);
         this.held.set(e.pointerId, bit);

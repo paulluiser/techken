@@ -55,6 +55,7 @@ export interface MatchConfig {
   items: boolean;
   hazards: boolean;
   seed: number;
+  loop?: boolean; // attract mode: start a new match automatically
 }
 
 export interface State {
@@ -77,7 +78,12 @@ export interface State {
   otHp: [number, number]; // HP when Overtime started (first clean hit wins)
   tiebreak: number; // 1 during the Production Incident tiebreaker round
   hz: number[]; // arena hazard timers/values (8)
+  stats: [number[], number[]]; // per match, see ST
 }
+
+/** Indexes into State.stats[player] (match stats for the Post-Mortem screen). */
+export const ST = { DMG: 0, MAX_COMBO: 1, BURNOUTS: 2, ITEMS: 3, PERFECT: 4, COMBO: 5, ROUND_TAKEN: 6 } as const;
+export const N_STATS = 7;
 
 /** Entities owned by the arena (hazards) use this owner id. */
 export const ENV = 2;

@@ -39,6 +39,7 @@ export function randomConfig(arena?: number): MatchConfig {
     sets: [r(2), r(2)],
     arena: arena ?? r(13),
     seed: (Math.random() * 2 ** 31) | 0,
+    loop: true,
   };
 }
 
@@ -50,6 +51,9 @@ export class Driver {
   stalls = 0;
   lastStallAt = 0;
   paused = false;
+  epoch = 0;
+  /** Cosmetic, not part of the sim: names and palettes for the renderer. */
+  view = { names: ["", ""] as [string, string], palettes: [0, 0] as [number, number] };
   private local: State = initState(randomConfig());
   private acc = 0;
   private lastTime = 0;
@@ -65,8 +69,11 @@ export class Driver {
     this.me = me;
     this.link = link;
     this.acc = 0;
-    this.session = new RollbackSession({ me, delay, send: (m) => link.sendGame(m), now: () => performance.now(), initial: initState(cfg) });
+    const epoch = (this.epoch = cfg.seed);
+    this.session = new RollbackSession({ me, delay, send: (m) => link.sendGame({ ...m, e: epoch }), now: () => performance.now(), initial: initState(cfg) });
   }
+  /** Rematch / re-pick keep the connection but start a fresh session. */
+  keepLink(): PeerLink | null { const l = this.link; this.link = null; this.session = null; return l; }
   stopOnline() {
     this.link?.close();
     this.link = null;

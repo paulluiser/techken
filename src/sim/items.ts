@@ -76,6 +76,7 @@ export function stepItems(s: State) {
       if (f.hp <= 0) continue;
       if (Math.abs(f.x - it.x) < px(14) && f.y - it.y > -px(6) && f.y - it.y < px(40)) {
         ITEMS[it.kind].apply(s, i);
+        s.stats[i][3]++; // ST.ITEMS
         it.life = 0;
         break;
       }

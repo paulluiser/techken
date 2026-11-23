@@ -13,7 +13,7 @@ import { stepItems, throwInvite } from "./items";
 import { hazardPlatformOff, stepHazards } from "./hazards";
 import { IN_ATTACK, IN_DASH, IN_DOWN, IN_GUARD, IN_LEFT, IN_RIGHT, IN_SKILLS, IN_UP, type Input } from "./input";
 import { BEH } from "./registry";
-import { K, N_RES, N_ST, S, type Entity, type Fighter, type MatchConfig, type State } from "./types";
+import { K, N_RES, N_ST, N_STATS, S, ST, type Entity, type Fighter, type MatchConfig, type State } from "./types";
 
 export type { State, Fighter, Entity, MatchConfig } from "./types";
 
@@ -52,6 +52,7 @@ export function initState(cfg: MatchConfig = DEFAULT_CONFIG): State {
     rng: (cfg.seed >>> 0) || 1, nextId: 1, itemT: C.ITEM_FIRST,
     f: [] as unknown as [Fighter, Fighter], ents: [], items: [],
     ot: 0, otHp: [0, 0], tiebreak: 0, hz: new Array(8).fill(0),
+    stats: [new Array(N_STATS).fill(0), new Array(N_STATS).fill(0)],
   };
   initFighters(s);
   return s;
@@ -69,6 +70,7 @@ export function cloneState(s: State): State {
     items: s.items.map((it) => ({ ...it })),
     otHp: [s.otHp[0], s.otHp[1]],
     hz: s.hz.slice(),
+    stats: [s.stats[0].slice(), s.stats[1].slice()],
   };
 }
 
@@ -98,6 +100,7 @@ export function checksum(s: State): number {
   for (const it of s.items) { mix(it.id); mix(it.kind); mix(it.x); mix(it.y); mix(it.life); }
   mix(s.ot); mix(s.otHp[0]); mix(s.otHp[1]); mix(s.tiebreak);
   for (const v of s.hz) mix(v);
+  for (const st of s.stats) for (const v of st) mix(v);
   return h >>> 0;
 }
 
@@ -110,6 +113,7 @@ const TIMERS = [
 
 function tickStatuses(s: State, i: number) {
   const f = s.f[i];
+  if (f.burnout === C.BURNOUT_FRAMES) s.stats[i][ST.BURNOUTS]++;
   for (const k of TIMERS) if (f.st[k] > 0) f.st[k]--;
   if (f.st[S.STUN] > 0 && --f.st[S.STUN] === 0) f.st[S.CC_IMMUNE] = C.CC_IMMUNE;
   if (f.st[S.ROOT] > 0 && --f.st[S.ROOT] === 0) f.st[S.CC_IMMUNE] = C.CC_IMMUNE;
@@ -373,6 +377,7 @@ function stepEntities(s: State) {
 
 function resetRound(s: State) {
   s.ents = []; s.items = []; s.itemT = C.ITEM_FIRST; s.ot = 0; s.hz = new Array(8).fill(0);
+  for (const st of s.stats) st[ST.ROUND_TAKEN] = 0;
   initFighters(s);
   s.timer = s.tiebreak ? C.sec(45) : C.ROUND_FRAMES; s.phase = PHASE_FIGHT; s.phaseT = 0; s.roundWinner = -1;
   if (s.tiebreak) { s.f[0].hp = C.HP_MAX >> 1; s.f[1].hp = C.HP_MAX >> 1; }
@@ -391,7 +396,12 @@ export function step(s: State, inputs: readonly [Input, Input]) {
           s.phase = PHASE_MATCH_END; s.phaseT = C.MATCH_PAUSE;
           s.matchWinner = s.wins[0] === s.wins[1] ? 2 : s.wins[0] > s.wins[1] ? 0 : 1;
         } else { s.round++; resetRound(s); }
-      } else { s.wins = [0, 0]; s.round = 1; s.matchWinner = -1; s.tiebreak = 0; resetRound(s); }
+      } else {
+        if (!s.cfg.loop) { s.phaseT = 1; return; } // hold on the result until players choose (Post-Mortem)
+        s.wins = [0, 0]; s.round = 1; s.matchWinner = -1; s.tiebreak = 0;
+        s.stats = [new Array(N_STATS).fill(0), new Array(N_STATS).fill(0)];
+        resetRound(s);
+      }
     }
     return;
   }
@@ -425,6 +435,7 @@ export function step(s: State, inputs: readonly [Input, Input]) {
     if (w === 0 || w === 2) s.wins[0]++;
     if (w === 1 || w === 2) s.wins[1]++;
     s.roundWinner = w; s.phase = PHASE_ROUND_END; s.phaseT = C.ROUND_PAUSE;
+    if ((w === 0 || w === 1) && s.stats[w][ST.ROUND_TAKEN] === 0) s.stats[w][ST.PERFECT]++;
   }
 }
 
