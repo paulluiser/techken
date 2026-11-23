@@ -1,0 +1,23 @@
+{
+  "name": "techken",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Techken online test: two boxes, rollback netcode over WebRTC, lobby codes on Vercel.",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "phaser": "4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "7.0.2",
+    "vite": "8.3.6",
+    "vitest": "5.1.0"
+  }
+}

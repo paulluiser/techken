@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0d0f17">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Techken · Online Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+</head>
+<body>
+  <div id="app">
+    <div id="game" aria-label="Game screen"></div>
+
+    <div id="touch" hidden>
+      <div class="pad left">
+        <button data-bit="1" aria-label="Move left">◀</button>
+        <button data-bit="8" aria-label="Down / drop through">▼</button>
+        <button data-bit="2" aria-label="Move right">▶</button>
+      </div>
+      <div class="pad right">
+        <button data-bit="32" class="small" aria-label="Dash">DASH</button>
+        <button data-bit="4" class="small" aria-label="Jump">JUMP</button>
+        <button data-bit="16" class="attack" aria-label="Attack, hold to charge">ATK</button>
+      </div>
+    </div>
+
+    <pre id="debug" hidden></pre>
+    <button id="leave" class="chip" hidden>LEAVE</button>
+
+    <section class="screen" id="s-menu">
+      <div class="window">
+        <div class="titlebar">TECHKEN OS — ONLINE TEST</div>
+        <div class="body">
+          <p class="lead">Two boxes, rollback netcode, lobby codes. Fight a friend on another device to see if online feels right.</p>
+          <div class="row">
+            <button class="btn primary" id="b-host">CREATE MEETING</button>
+            <button class="btn" id="b-join">JOIN MEETING</button>
+            <button class="btn" id="b-practice">PRACTICE VS CPU</button>
+          </div>
+          <details id="settings">
+            <summary>Test settings</summary>
+            <div class="grid">
+              <label>Input delay
+                <select id="o-delay"><option value="0">0 frames</option><option value="1">1 frame</option><option value="2">2 frames</option><option value="3">3 frames</option><option value="4">4 frames</option></select>
+              </label>
+              <label>Simulated lag (one way)
+                <select id="o-lag"><option value="0">Off</option><option value="25">25 ms</option><option value="50">50 ms</option><option value="75">75 ms</option><option value="100">100 ms</option><option value="150">150 ms</option></select>
+              </label>
+              <label>Jitter
+                <select id="o-jitter"><option value="0">Off</option><option value="10">±10 ms</option><option value="25">±25 ms</option><option value="50">±50 ms</option></select>
+              </label>
+              <label>Packet loss
+                <select id="o-loss"><option value="0">0 %</option><option value="2">2 %</option><option value="5">5 %</option><option value="10">10 %</option><option value="20">20 %</option></select>
+              </label>
+              <label class="check"><input type="checkbox" id="o-relay"> Force TURN relay</label>
+              <label class="check"><input type="checkbox" id="o-auto"> Autoplay (random inputs)</label>
+              <label class="check"><input type="checkbox" id="o-debug" checked> Show netcode stats</label>
+            </div>
+            <p class="hint">Lag settings apply to what <em>you</em> send. Set them on both devices to simulate a bad connection both ways.</p>
+          </details>
+          <p class="keys"><b>Keyboard:</b> A/D or ←/→ move · W/↑/Space jump · S/↓ drop · <b>J</b> attack (hold to charge) · L or Shift dash</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="s-meeting" hidden>
+      <div class="window">
+        <div class="titlebar">MEETING ROOM <button class="x" data-back aria-label="Cancel">×</button></div>
+        <div class="body">
+          <p class="label">Meeting ID</p>
+          <p class="code" id="m-code">······</p>
+          <div class="row">
+            <button class="btn primary" id="b-copy" disabled>COPY LINK</button>
+            <button class="btn" id="b-share" hidden>SHARE</button>
+          </div>
+          <p class="status" id="m-status" aria-live="polite">Creating meeting…</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="s-join" hidden>
+      <div class="window">
+        <div class="titlebar">JOIN MEETING <button class="x" data-back aria-label="Cancel">×</button></div>
+        <div class="body">
+          <label class="label" for="j-code">Meeting ID or link</label>
+          <input id="j-code" class="codein" maxlength="80" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7QX2M">
+          <div class="row"><button class="btn primary" id="b-join-go">JOIN</button></div>
+          <p class="status" id="j-status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="s-msg" hidden>
+      <div class="window">
+        <div class="titlebar" id="msg-title">NOTICE</div>
+        <div class="body">
+          <p class="status" id="msg-text"></p>
+          <div class="row"><button class="btn primary" data-back>BACK TO MENU</button></div>
+        </div>
+      </div>
+    </section>
+
+    <div id="rotate">Rotate your phone to landscape</div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
