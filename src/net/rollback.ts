@@ -9,6 +9,7 @@
 // Saved states let us rewind; checksums of fully confirmed frames detect desyncs.
 import { checksum, cloneState, step, type State } from "../sim/sim";
 import type { GameMsg } from "./protocol";
+import { IN_ALL } from "../sim/input";
 
 export const RING = 128; // saved states kept
 export const MAX_ROLLBACK = 8; // stall instead of predicting further than this
@@ -134,7 +135,7 @@ export class RollbackSession {
     }
 
     const target = this.frame + this.delay;
-    if (!this.local.has(target)) this.local.set(target, localInput & 63);
+    if (!this.local.has(target)) this.local.set(target, localInput & IN_ALL);
 
     this.applyRollback();
     this.simulate(this.frame);

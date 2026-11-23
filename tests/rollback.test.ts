@@ -4,7 +4,10 @@
 import { describe, expect, it } from "vitest";
 import { RollbackSession } from "../src/net/rollback";
 import type { GameMsg } from "../src/net/protocol";
-import { checksum, initState, step } from "../src/sim/sim";
+import { checksum, DEFAULT_CONFIG, initState, step } from "../src/sim/sim";
+
+// a busy matchup: summons, projectiles, zones, tokens
+const CFG = { ...DEFAULT_CONFIG, jobs: [8, 16] as [number, number], sets: [0, 0] as [number, number], arena: 4, items: true, seed: 42 };
 
 function rng(seed: number) {
   let s = seed >>> 0;
@@ -24,14 +27,14 @@ function play(net: Net, ticks: number, delays: [number, number], seed = 1) {
     queues[1 - from].push({ at: clock + d * (1000 / 60), m: JSON.parse(JSON.stringify(m)) });
   };
   const sess = [
-    new RollbackSession({ me: 0, delay: delays[0], send: sendFrom(0), now, initial: initState() }),
-    new RollbackSession({ me: 1, delay: delays[1], send: sendFrom(1), now, initial: initState() }),
+    new RollbackSession({ me: 0, delay: delays[0], send: sendFrom(0), now, initial: initState(CFG) }),
+    new RollbackSession({ me: 1, delay: delays[1], send: sendFrom(1), now, initial: initState(CFG) }),
   ];
   // what each player actually pressed, by the frame it applies to
   const log: Map<number, number>[] = [new Map(), new Map()];
   const cur = [0, 0], left = [0, 0];
   const nextInput = (i: number) => {
-    if (--left[i] <= 0) { cur[i] = Math.floor(r() * 64); left[i] = 3 + Math.floor(r() * 25); }
+    if (--left[i] <= 0) { cur[i] = Math.floor(r() * 1024); left[i] = 3 + Math.floor(r() * 25); }
     return cur[i];
   };
   for (let t = 0; t < ticks; t++) {
@@ -52,7 +55,7 @@ function play(net: Net, ticks: number, delays: [number, number], seed = 1) {
 
 /** Straight simulation (no rollback) to frame n with the inputs players really pressed. */
 function reference(log: Map<number, number>[], n: number) {
-  const s = initState();
+  const s = initState(CFG);
   for (let f = 0; f < n; f++) step(s, [log[0].get(f) ?? 0, log[1].get(f) ?? 0]);
   return checksum(s);
 }

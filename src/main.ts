@@ -1,7 +1,10 @@
 import "./style.css";
 import * as Phaser from "phaser";
 import * as C from "./sim/constants";
-import { Driver } from "./game/driver";
+import { ARENAS } from "./sim/arenas";
+import { JOBS, JOB_CODES, JOB_NAMES } from "./sim/registry";
+import { DEFAULT_CONFIG, type MatchConfig } from "./sim/sim";
+import { Driver, implementedJobs } from "./game/driver";
 import { Autoplay, CombinedInput, Keyboard, TouchPad } from "./game/input-sources";
 import { GameScene } from "./render/GameScene";
 import { PeerLink } from "./net/transport";
@@ -9,14 +12,16 @@ import { PROTOCOL_VERSION, type CtrlMsg } from "./net/protocol";
 import { createLobby, fetchOffer, getIceServers, LobbyError, normalizeCode, postAnswer, waitForAnswer } from "./net/lobby-client";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 
 // ---------- settings (per browser) ----------
-interface Settings { delay: number; lag: number; jitter: number; loss: number; relay: boolean; auto: boolean; debug: boolean }
-const DEFAULTS: Settings = { delay: 2, lag: 0, jitter: 0, loss: 0, relay: false, auto: false, debug: true };
+interface Settings { delay: number; lag: number; jitter: number; loss: number; relay: boolean; auto: boolean; debug: boolean; job: number; set: number; arena: number }
+const DEFAULTS: Settings = { delay: 2, lag: 0, jitter: 0, loss: 0, relay: false, auto: false, debug: true, job: 0, set: 0, arena: 0 };
 function loadSettings(): Settings {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem("techken.test.settings") || "{}") }; } catch { return { ...DEFAULTS }; }
 }
 const settings = loadSettings();
+if (!JOBS[settings.job]) settings.job = 0;
 const saveSettings = () => { try { localStorage.setItem("techken.test.settings", JSON.stringify(settings)); } catch { /* private mode */ } };
 const bindSelect = (id: string, key: "delay" | "lag" | "jitter" | "loss") => {
   const el = $<HTMLSelectElement>(id);
@@ -39,10 +44,8 @@ auto.enabled = settings.auto;
 const driver = new Driver(new CombinedInput(kb, touch, auto));
 const isTouch = matchMedia("(pointer: coarse)").matches || new URLSearchParams(location.search).has("touch");
 
-// The simulation/netcode loop runs on its own animation frame, independent of the renderer,
-// so a slow or late-starting renderer can never hold up the match.
-// driver.update() steps by the real clock, so calling it from both loops is safe: animation
-// frames give smooth timing, the interval keeps the match ticking if frames are throttled.
+// The simulation loop runs independently of the renderer (animation frames + an interval
+// backup); driver.update() steps by the real clock, so calling it from both is safe.
 function simLoop() { driver.update(); requestAnimationFrame(simLoop); }
 requestAnimationFrame(simLoop);
 setInterval(() => driver.update(), 8);
@@ -51,12 +54,7 @@ let game: Phaser.Game | null = null;
 async function bootPhaser() {
   try { await Promise.race([document.fonts.load('8px "Press Start 2P"'), new Promise((r) => setTimeout(r, 1500))]); } catch { /* fallback font */ }
   game = new Phaser.Game({
-    type: Phaser.AUTO,
-    parent: "game",
-    width: C.W,
-    height: C.H,
-    pixelArt: true,
-    backgroundColor: "#05060a",
+    type: Phaser.AUTO, parent: "game", width: C.W, height: C.H, pixelArt: true, backgroundColor: "#05060a",
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [new GameScene(driver)],
   });
@@ -64,7 +62,7 @@ async function bootPhaser() {
 bootPhaser();
 
 // ---------- screens ----------
-const screens = ["s-menu", "s-meeting", "s-join", "s-msg"];
+const screens = ["s-menu", "s-meeting", "s-join", "s-pick", "s-msg"];
 function show(id: string | null) {
   for (const s of screens) $(s).hidden = s !== id;
   const playing = id === null;
@@ -84,9 +82,11 @@ function setStatus(id: string, text: string, err = false) {
 
 let abort: AbortController | null = null;
 let connectTimer = 0;
+let pending: PeerLink | null = null;
 function backToMenu() {
   abort?.abort(); abort = null;
   clearTimeout(connectTimer);
+  pending?.close(); pending = null;
   driver.startAttract();
   history.replaceState(null, "", location.pathname);
   show("s-menu");
@@ -95,7 +95,65 @@ for (const el of document.querySelectorAll<HTMLElement>("[data-back]")) el.addEv
 $("leave").addEventListener("click", backToMenu);
 addEventListener("keydown", (e) => { if (e.key === "Escape" && $("s-menu").hidden) backToMenu(); });
 
-$("b-practice").addEventListener("click", () => { driver.startPractice(); show(null); });
+// ---------- Employee Directory (job + set pick) ----------
+type PickMode = "practice" | "host" | "guest";
+let pickMode: PickMode = "practice";
+let onReady: (job: number, set: number, arena: number, cpu: number, items: boolean) => void = () => {};
+
+function renderPick() {
+  const grid = $("p-jobs");
+  grid.innerHTML = "";
+  JOB_NAMES.forEach((name, k) => {
+    const j = JOBS[k];
+    const b = document.createElement("button");
+    b.textContent = JOB_CODES[k];
+    b.title = j ? name : `${name} (coming in phase 2)`;
+    b.style.background = j ? `#${j.color.toString(16).padStart(6, "0")}` : "#3d3a4a";
+    b.disabled = !j;
+    b.setAttribute("aria-selected", String(settings.job === k));
+    b.addEventListener("click", () => { settings.job = k; settings.set = 0; saveSettings(); renderPick(); });
+    grid.appendChild(b);
+  });
+  const j = JOBS[settings.job]!;
+  $("p-jobname").textContent = `${j.name.toUpperCase()} · charge ${(j.chargeFull / 60).toFixed(1)} s · ${j.tap}/${j.full} dmg · ${j.ranged ? "ranged" : "melee"} · weight ${j.weight}`;
+  const sets = $("p-sets");
+  sets.innerHTML = "";
+  j.sets.forEach((st, k) => {
+    const b = document.createElement("button");
+    b.className = "setcard";
+    b.setAttribute("aria-pressed", String(settings.set === k));
+    b.innerHTML = `<h4>SET ${"AB"[k]}: "${esc(st.name)}"</h4><span class="pas">◆ ${esc(st.passive)}: ${esc(st.passiveDesc)}</span>` +
+      st.skills.map((sk, n) => `<span class="sk">${"UIO"[n]} · ${esc(sk.name)} (${sk.cost / 100}${sk.tok ? ` + ${sk.tok / 100} tok` : ""} / ${sk.cd / 60}s): ${esc(sk.desc)}</span>`).join("") +
+      `<span class="sk"><i>${esc(st.combo)}</i></span>`;
+    b.addEventListener("click", () => { settings.set = k; saveSettings(); renderPick(); });
+    sets.appendChild(b);
+  });
+  $("p-arena-wrap").hidden = pickMode === "guest";
+  $("p-cpu-wrap").hidden = pickMode !== "practice";
+}
+function openPick(mode: PickMode, ready: typeof onReady) {
+  pickMode = mode; onReady = ready;
+  const ar = $<HTMLSelectElement>("p-arena");
+  ar.innerHTML = ARENAS.map((a, k) => `<option value="${k}">${esc(a.name)}</option>`).join("");
+  ar.value = String(settings.arena);
+  const cpu = $<HTMLSelectElement>("p-cpu");
+  cpu.innerHTML = `<option value="-1">Random</option>` + implementedJobs().map((k) => `<option value="${k}">${esc(JOB_NAMES[k])}</option>`).join("");
+  $<HTMLButtonElement>("p-ready").disabled = false;
+  setStatus("p-status", mode === "practice" ? "" : "Your pick stays hidden until you're both ready.");
+  renderPick();
+  show("s-pick");
+}
+$("p-ready").addEventListener("click", () => {
+  settings.arena = Number($<HTMLSelectElement>("p-arena").value); saveSettings();
+  onReady(settings.job, settings.set, settings.arena, Number($<HTMLSelectElement>("p-cpu").value), $<HTMLInputElement>("p-items").checked);
+});
+
+$("b-practice").addEventListener("click", () => openPick("practice", (job, set, arena, cpu, items) => {
+  const jobs = implementedJobs();
+  const cj = cpu >= 0 ? cpu : jobs[Math.floor(Math.random() * jobs.length)];
+  driver.startPractice({ ...DEFAULT_CONFIG, jobs: [job, cj], sets: [set, Math.floor(Math.random() * 2)], arena, items, seed: (Math.random() * 2 ** 31) | 0 });
+  show(null);
+}));
 
 // ---------- online ----------
 function applyLag() {
@@ -104,20 +162,39 @@ function applyLag() {
 
 function makeLink(ice: RTCIceServer[], role: 0 | 1, statusId: string): PeerLink {
   let started = false;
+  let mine: { job: number; set: number; arena: number; items: boolean } | null = null;
+  let theirs: { job: number; set: number } | null = null;
+  const tryStart = () => {
+    if (role !== 0 || started || !mine || !theirs) return;
+    started = true;
+    const cfg: MatchConfig = { ...DEFAULT_CONFIG, jobs: [mine.job, theirs.job], sets: [mine.set, theirs.set], arena: mine.arena, items: mine.items, seed: (Math.random() * 2 ** 31) | 0 };
+    link.sendCtrl({ t: "start", cfg });
+    begin(link, 0, cfg);
+  };
   const link: PeerLink = new PeerLink(ice, settings.relay, {
     onOpen: () => {
       clearTimeout(connectTimer);
-      setStatus(statusId, "Connected. Starting…");
+      setStatus(statusId, "Connected.");
       link.sendCtrl({ t: "hello", v: PROTOCOL_VERSION, delay: settings.delay });
     },
     onCtrl: (m: CtrlMsg) => {
       if (m.t === "hello") {
         if (m.v !== PROTOCOL_VERSION) { link.close(); message("VERSION MISMATCH", "You and your opponent are on different versions. Both refresh the page and try again."); return; }
-        if (role === 0 && !started) { started = true; link.sendCtrl({ t: "start", at: 0 }); begin(link, 0); }
+        openPick(role === 0 ? "host" : "guest", (job, set, arena, _cpu, items) => {
+          mine = { job, set, arena, items };
+          link.sendCtrl({ t: "pick", job, set });
+          $<HTMLButtonElement>("p-ready").disabled = true;
+          setStatus("p-status", "Ready. Waiting for your opponent's pick…");
+          tryStart();
+        });
+      } else if (m.t === "pick") {
+        if (JOBS[m.job] && (m.set === 0 || m.set === 1)) theirs = { job: m.job, set: m.set };
+        tryStart();
       } else if (m.t === "start" && role === 1 && !started) {
-        started = true; begin(link, 1);
+        started = true;
+        begin(link, 1, m.cfg);
       } else if (m.t === "bye") {
-        if (driver.link === link) message("OPPONENT LEFT", "Your opponent left the meeting.");
+        if (driver.link === link || pending === link) message("OPPONENT LEFT", "Your opponent left the meeting.");
       }
     },
     onGame: (m) => { if (driver.link === link) driver.session?.onMessage(m); },
@@ -127,11 +204,13 @@ function makeLink(ice: RTCIceServer[], role: 0 | 1, statusId: string): PeerLink 
       else if (!started) setStatus(statusId, `${reason} If one of you is on mobile data or office Wi-Fi, the TURN relay is needed (see README).`, true);
     },
   });
+  pending = link;
   return link;
 }
 
-function begin(link: PeerLink, me: 0 | 1) {
-  driver.startOnline(link, me, settings.delay);
+function begin(link: PeerLink, me: 0 | 1, cfg: MatchConfig) {
+  pending = null;
+  driver.startOnline(link, me, settings.delay, cfg);
   applyLag();
   history.replaceState(null, "", location.pathname);
   show(null);
@@ -236,13 +315,12 @@ setInterval(async () => {
   el.style.color = st.desync ? "var(--danger)" : "";
 }, 250);
 
-// tab switching counts as a disconnect for the opponent (browsers pause hidden tabs)
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && driver.mode === "practice") show("s-menu");
 });
 
 // ---------- start ----------
-if (import.meta.env.DEV) (window as unknown as { techken: unknown }).techken = { driver, game: () => game };
+if (import.meta.env.DEV) (window as unknown as { techken: unknown }).techken = { driver, game: () => game, settings };
 driver.startAttract();
 const params = new URLSearchParams(location.search);
 if (params.has("auto")) auto.enabled = true; // dev: random inputs for this page only
@@ -250,3 +328,8 @@ const qp = params.get("code");
 if (qp) join(qp);
 else if (params.has("host")) $("b-host").click(); // dev harness: create a meeting right away
 else show("s-menu");
+// dev harness: auto-ready on the pick screen
+if (params.has("autopick")) {
+  new MutationObserver(() => { const b = $<HTMLButtonElement>("p-ready"); if (!$("s-pick").hidden && !b.disabled) b.click(); })
+    .observe($("s-pick"), { attributes: true });
+}

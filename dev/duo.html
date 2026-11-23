@@ -27,9 +27,9 @@
     bc.onmessage = (e) => {
       if (!e.data || !e.data.code) return;
       st.textContent = "code " + e.data.code + ", guest joining…";
-      b.src = "/?code=" + e.data.code + autoQ();
+      b.src = "/?autopick=1&code=" + e.data.code + autoQ();
     };
-    function go() { st.textContent = "host creating meeting…"; b.src = "about:blank"; a.src = "/?host=1" + autoQ(); }
+    function go() { st.textContent = "host creating meeting…"; b.src = "about:blank"; a.src = "/?host=1&autopick=1" + autoQ(); }
     document.getElementById("go").onclick = go;
     go();
   </script>

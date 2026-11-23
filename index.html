@@ -21,9 +21,17 @@
         <button data-bit="2" aria-label="Move right">▶</button>
       </div>
       <div class="pad right">
-        <button data-bit="32" class="small" aria-label="Dash">DASH</button>
-        <button data-bit="4" class="small" aria-label="Jump">JUMP</button>
-        <button data-bit="16" class="attack" aria-label="Attack, hold to charge">ATK</button>
+        <div class="skills">
+          <button data-bit="128" class="small" aria-label="Skill 1">S1</button>
+          <button data-bit="256" class="small" aria-label="Skill 2">S2</button>
+          <button data-bit="512" class="small" aria-label="Skill 3">S3</button>
+        </div>
+        <div class="main">
+          <button data-bit="64" class="small" aria-label="Guard">GRD</button>
+          <button data-bit="32" class="small" aria-label="Dash">DASH</button>
+          <button data-bit="4" class="small" aria-label="Jump">JUMP</button>
+          <button data-bit="16" class="attack" aria-label="Attack, hold to charge">ATK</button>
+        </div>
       </div>
     </div>
 
@@ -61,7 +69,7 @@
             </div>
             <p class="hint">Lag settings apply to what <em>you</em> send. Set them on both devices to simulate a bad connection both ways.</p>
           </details>
-          <p class="keys"><b>Keyboard:</b> A/D or ←/→ move · W/↑/Space jump · S/↓ drop · <b>J</b> attack (hold to charge) · L or Shift dash</p>
+          <p class="keys"><b>Keyboard:</b> A/D move · W/Space jump · S drop · <b>J</b> attack (hold to charge) · <b>K</b> guard · L/Shift dash · <b>U I O</b> skills</p>
         </div>
       </div>
     </section>
@@ -89,6 +97,24 @@
           <input id="j-code" class="codein" maxlength="80" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7QX2M">
           <div class="row"><button class="btn primary" id="b-join-go">JOIN</button></div>
           <p class="status" id="j-status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="s-pick" hidden>
+      <div class="window wide">
+        <div class="titlebar">EMPLOYEE DIRECTORY <button class="x" data-back aria-label="Back">×</button></div>
+        <div class="body">
+          <div class="pickgrid" id="p-jobs" role="listbox" aria-label="Jobs"></div>
+          <p class="label" id="p-jobname"></p>
+          <div class="sets" id="p-sets"></div>
+          <div class="row opts">
+            <label id="p-arena-wrap">Arena <select id="p-arena"></select></label>
+            <label id="p-cpu-wrap">CPU <select id="p-cpu"></select></label>
+            <label class="check"><input type="checkbox" id="p-items" checked> Items</label>
+          </div>
+          <div class="row"><button class="btn primary" id="p-ready">READY</button></div>
+          <p class="status" id="p-status" aria-live="polite"></p>
         </div>
       </div>
     </section>

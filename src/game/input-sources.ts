@@ -1,12 +1,15 @@
-import { IN_ATTACK, IN_DASH, IN_DOWN, IN_LEFT, IN_RIGHT, IN_UP } from "../sim/input";
+import { IN_ATTACK, IN_DASH, IN_DOWN, IN_GUARD, IN_LEFT, IN_RIGHT, IN_S1, IN_S2, IN_S3, IN_UP } from "../sim/input";
 
+// GDD 7.1: A/D move, W/Space jump, S drop, J attack, K guard, L dash, U/I/O skills
 const KEYMAP: Record<string, number> = {
   ArrowLeft: IN_LEFT, KeyA: IN_LEFT,
   ArrowRight: IN_RIGHT, KeyD: IN_RIGHT,
   ArrowUp: IN_UP, KeyW: IN_UP, Space: IN_UP,
   ArrowDown: IN_DOWN, KeyS: IN_DOWN,
   KeyJ: IN_ATTACK,
+  KeyK: IN_GUARD,
   KeyL: IN_DASH, ShiftLeft: IN_DASH, ShiftRight: IN_DASH,
+  KeyU: IN_S1, KeyI: IN_S2, KeyO: IN_S3,
 };
 
 export class Keyboard {
@@ -69,6 +72,8 @@ export class Autoplay {
       if (Math.random() < 0.12) b |= IN_UP;
       if (Math.random() < 0.06) b |= IN_DASH;
       if (Math.random() < 0.05) b |= IN_DOWN;
+      if (Math.random() < 0.06) b |= IN_GUARD;
+      if (Math.random() < 0.05) b |= [IN_S1, IN_S2, IN_S3][Math.floor(Math.random() * 3)];
       this.cur = b;
       this.left = 6 + Math.floor(Math.random() * 40);
     }

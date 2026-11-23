@@ -1,4 +1,8 @@
-# Techken: online test
+# Techken
+
+**Build status:** see `ROADMAP.md`. Phase 1 is done: the combat engine (guard, skills, status caps, summons, projectiles, zones, all 14 items, all 13 arena layouts) and 6 jobs with both sets each (Software Engineer, QA, DBA, Cloud Engineer, Tech Support, Vibe Coder), playable vs CPU and online with a blind job/set pick.
+
+## Online test (phase 0)
 
 The first build of Techken: two boxes fighting online. It exists to prove that browser
 rollback netcode feels good between a laptop and a phone before any art or fighters are made
@@ -43,7 +47,9 @@ npm run dev
 | Jump | W, ↑ or Space |
 | Drop through a platform | S or ↓ |
 | Attack | **J** (hold to charge) |
+| Guard | **K** |
 | Dash | L or Shift |
+| Skills | **U / I / O** |
 
 On phones the on-screen buttons appear automatically. Add `?touch=1` to force them on desktop.
 
