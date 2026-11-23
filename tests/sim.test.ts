@@ -4,7 +4,7 @@ import { ARENAS } from "../src/sim/arenas";
 import { ITEMS } from "../src/sim/items";
 import { IN_ATTACK, IN_DASH, IN_GUARD, IN_LEFT, IN_RIGHT, IN_S1, IN_S2, IN_S3 } from "../src/sim/input";
 import { JOBS } from "../src/sim/registry";
-import { checksum, cloneState, DEFAULT_CONFIG, initState, step, type MatchConfig, type State } from "../src/sim/sim";
+import { checksum, cloneState, DEFAULT_CONFIG, initState, OT_FRAMES, PHASE_ROUND_END, step, type MatchConfig, type State } from "../src/sim/sim";
 import { S } from "../src/sim/types";
 import { stun } from "../src/sim/core";
 
@@ -155,3 +155,60 @@ describe("core rules", () => {
     }
   });
 });
+
+describe("phase 3: hazards, Overtime, tiebreak, aiming", () => {
+  const idle = (s: State, n: number, inp: [number, number] = [0, 0]) => { for (let i = 0; i < n; i++) step(s, inp); };
+
+  it("a tie at time-out starts Overtime; the first clean hit wins", () => {
+    const s = initState(cfg(0, 0));
+    s.timer = 1;
+    step(s, [0, 0]);
+    expect(s.ot).toBe(1);
+    expect(s.timer).toBe(OT_FRAMES);
+    s.f[0].x = 150 * C.SUB; s.f[1].x = 175 * C.SUB;
+    idle(s, 2, [IN_ATTACK, 0]); idle(s, 10);
+    expect(s.phase).toBe(PHASE_ROUND_END);
+    expect(s.wins[0]).toBe(1);
+  });
+
+  it("2-2 after a double KO goes to a Production Incident round at 50 % HP", () => {
+    const s = initState(cfg(0, 0));
+    s.wins = [1, 1];
+    s.f[0].hp = 0; s.f[1].hp = 0;
+    step(s, [0, 0]);
+    expect(s.wins).toEqual([2, 2]);
+    idle(s, C.ROUND_PAUSE + 1);
+    expect(s.tiebreak).toBe(1);
+    expect(s.f[0].hp).toBe(500);
+    expect(s.timer).toBeGreaterThan(C.sec(45) - 3); // a frame into the new round
+  });
+
+  it("holding an 'anywhere' skill aims it; a tap smart-casts on the opponent", () => {
+    const s = initState(cfg(7, 0)); // Cloud Engineer, Rain Cloud on S1
+    for (let k = 0; k < 20; k++) step(s, [IN_S1 | IN_LEFT, 0]);
+    step(s, [0, 0]);
+    const rain = s.ents.find((e) => e.b === "ce.rain")!;
+    expect(rain).toBeDefined();
+    expect(rain.x).toBeLessThan(s.f[1].x - 40 * C.SUB);
+    const t = initState(cfg(7, 0));
+    step(t, [IN_S1, 0]); step(t, [0, 0]);
+    expect(Math.abs(t.ents.find((e) => e.b === "ce.rain")!.x - t.f[1].x)).toBeLessThan(2 * C.SUB);
+  });
+
+  it("War Room drains 15 Motivation from both every 30 s", () => {
+    const s = initState({ ...cfg(0, 0, 0, 0, 8), items: false });
+    idle(s, C.sec(30) - 1);
+    const before = s.f[0].mot;
+    idle(s, 1);
+    expect(before - s.f[0].mot).toBeGreaterThanOrEqual(1500 - 20);
+  });
+
+  it("every arena with hazards replays identically", () => {
+    for (let a = 0; a < 13; a++) {
+      const c = { ...cfg(a % 17, (a * 5) % 17, a % 2, 0, a, true), seed: 3000 + a };
+      const inputs = randomInputs(40 + a, 3000);
+      expect(run(c, inputs).sums).toEqual(run(c, inputs).sums);
+    }
+  });
+});
+

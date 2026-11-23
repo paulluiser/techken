@@ -1,6 +1,6 @@
 // Project Manager — "Tickets and timelines". Controller. GDD §3.14.
 import { sec } from "../constants";
-import { buff, dealDamage, entBox, fighterBox, near, oldestHistory, opp, overlap, pm, projStep, pushCd, px, recordHistory, slow, spawn, stun, cancelActions } from "../core";
+import { targetX, buff, dealDamage, entBox, fighterBox, near, oldestHistory, opp, overlap, pm, projStep, pushCd, px, recordHistory, slow, spawn, stun, cancelActions } from "../core";
 import { JOBS, registerBeh, registerJob } from "../registry";
 import { K, S } from "../types";
 
@@ -56,8 +56,8 @@ registerJob({
         if (crunch) buff(f, "regen", 500, 2);
       },
       skills: [
-        { name: "Move the Deadline", cost: 2500, cd: sec(14), desc: "Slow-time bubble for 4 s: −40 % for them inside.",
-          cast(s, i) { const T = s.f[opp(i)]; spawn(s, { k: K.ZONE, b: "pm.bubble", o: i, x: T.x, y: T.y + px(10), w: 90, h: 80, life: sec(4) }); return true; } },
+        { name: "Move the Deadline", aim: true, cost: 2500, cd: sec(14), desc: "Slow-time bubble for 4 s: −40 % for them inside.",
+          cast(s, i) { const T = s.f[opp(i)]; spawn(s, { k: K.ZONE, b: "pm.bubble", o: i, x: targetX(s, i), y: T.y + px(10), w: 90, h: 80, life: sec(4) }); return true; } },
         { name: "Fast-Track", cost: 2500, cd: sec(14), desc: "Haste yourself 4 s: +35 % speed and charge.",
           cast(s, i) { const f = s.f[i]; buff(f, "spd", 350, sec(4)); buff(f, "chg", 350, sec(4)); return true; } },
         { name: "Push to Backlog", cost: 3500, cd: sec(18), desc: "Disable their last-used skill for 5 s.",

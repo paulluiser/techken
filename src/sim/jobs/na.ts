@@ -2,9 +2,10 @@
 import { sec } from "../constants";
 import { abs, buff, dealDamage, dxPx, entBox, kill, opp, overlap, ownEnts, pm, projStep, px, silence, slow, spawn, near } from "../core";
 import { registerBeh, registerJob } from "../registry";
+import { wifiDown } from "../hazards";
 import { K, S, type State } from "../types";
 
-const routerOf = (s: State, i: number) => ownEnts(s, i, "na.router")[0];
+const routerOf = (s: State, i: number) => (wifiDown(s) ? undefined : ownEnts(s, i, "na.router")[0]);
 function falloff(s: State, i: number, t: number) { // 100 % close, 70 % at max range
   const d = Math.min(240, dxPx(s.f[i], s.f[t]));
   return 1000 - Math.trunc((300 * d) / 240);

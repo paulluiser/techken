@@ -49,6 +49,7 @@ export class Driver {
   link: PeerLink | null = null;
   stalls = 0;
   lastStallAt = 0;
+  paused = false;
   private local: State = initState(randomConfig());
   private acc = 0;
   private lastTime = 0;
@@ -77,6 +78,7 @@ export class Driver {
     const now = performance.now();
     const dt = this.lastTime ? now - this.lastTime : STEP_MS;
     this.lastTime = now;
+    if (this.paused) return;
     this.acc += Math.min(dt, 250);
     let n = 0;
     while (this.acc >= STEP_MS && n < 10) { this.tick(); this.acc -= STEP_MS; n++; }

@@ -1,6 +1,6 @@
 // Cloud Engineer — "Literally clouds, strikes anywhere". Artillery. GDD §3.8.
 import { sec, WALL_L, WALL_R } from "../constants";
-import { abs, cancelActions, clamp, dealDamage, fighterBox, kill, opp, ownEnts, pm, projStep, px, slow, spawn, entBox, overlap } from "../core";
+import { targetX, abs, cancelActions, clamp, dealDamage, fighterBox, kill, opp, ownEnts, pm, projStep, px, slow, spawn, entBox, overlap } from "../core";
 import { registerBeh, registerJob } from "../registry";
 import { K, S, type Entity, type State } from "../types";
 
@@ -15,16 +15,16 @@ registerJob({
       passiveDesc: "Your clouds grow 20 % bigger every second they're alive.",
       combo: "Rain → Wet → Lightning. Cumulus gives you height to kite from.",
       skills: [
-        { name: "Rain Cloud", cost: 2000, cd: sec(7), desc: "Target them: rains 20/s for 3 s and makes them Wet.",
+        { name: "Rain Cloud", aim: true, cost: 2000, cd: sec(7), desc: "Target them: rains 20/s for 3 s and makes them Wet.",
           cast(s, i, pow) {
             const T = s.f[opp(i)];
-            spawn(s, { k: K.ZONE, b: "ce.rain", o: i, x: clampX(T.x), y: T.y - px(52), w: 40, h: 12, life: sec(3), p1: pow });
+            spawn(s, { k: K.ZONE, b: "ce.rain", o: i, x: clampX(targetX(s, i)), y: T.y - px(52), w: 40, h: 12, life: sec(3), p1: pow });
             return true;
           } },
-        { name: "Lightning Strike", cost: 3500, cd: sec(14), desc: "Target them: 0.8 s warning, then 100, or 200 if Wet.",
+        { name: "Lightning Strike", aim: true, cost: 3500, cd: sec(14), desc: "Target them: 0.8 s warning, then 100, or 200 if Wet.",
           cast(s, i, pow) {
             const T = s.f[opp(i)];
-            spawn(s, { k: K.DELAYED, b: "ce.bolt", o: i, x: clampX(T.x), y: px(184), w: 20, h: 184, life: 54, p1: pow });
+            void T; spawn(s, { k: K.DELAYED, b: "ce.bolt", o: i, x: clampX(targetX(s, i)), y: px(184), w: 20, h: 184, life: 54, p1: pow });
             return true;
           } },
         { name: "Cumulus", cost: 1500, cd: sec(8), desc: "Solid cloud platform for 5 s.",
@@ -66,10 +66,10 @@ registerJob({
             for (const a of anchors) aimShot(s, i, a.x, a.y - px(6), T.x, T.y - px(18), px(5), pm(60, pow));
             return true;
           } },
-        { name: "Cold Start", cost: 2500, cd: sec(16), desc: "Hail on them: 30 dmg, slow 40 % for 3 s.",
+        { name: "Cold Start", aim: true, cost: 2500, cd: sec(16), desc: "Hail on them: 30 dmg, slow 40 % for 3 s.",
           cast(s, i, pow) {
             const T = s.f[opp(i)];
-            spawn(s, { k: K.DELAYED, b: "ce.hail", o: i, x: clampX(T.x), y: T.y, w: 40, h: 60, life: 18, p1: pow });
+            spawn(s, { k: K.DELAYED, b: "ce.hail", o: i, x: clampX(targetX(s, i)), y: T.y, w: 40, h: 60, life: 18, p1: pow });
             return true;
           } },
       ],

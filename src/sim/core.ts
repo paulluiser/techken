@@ -76,6 +76,12 @@ export function buff(f: Fighter, kind: "dmg" | "spd" | "chg" | "regen", pct: num
 function ccImmune(f: Fighter) { return f.st[S.CC_IMMUNE] > 0 || f.st[S.CC_IMMUNE_ITEM] > 0 || f.st[S.INVULN] > 0; }
 export function cancelActions(f: Fighter) {
   f.charging = 0; f.charge = 0; f.atk = 0; f.recovery = 0; f.dash = 0; f.guarding = 0; f.st[S.CAST] = 0;
+  f.st[S.AIM_K] = 0; f.st[S.AIM_T] = 0;
+}
+/** Where an "anywhere" skill lands: the aimed spot while aiming, otherwise the opponent. */
+export function targetX(s: State, i: number): number {
+  const f = s.f[i];
+  return f.st[S.AIM_K] > 0 ? f.st[S.AIM_X] : s.f[1 - i].x;
 }
 /** Stun / freeze / trap / lock / grab. Max 1.5 s, then 1 s immunity. */
 export function stun(s: State, t: number, frames: number): boolean {

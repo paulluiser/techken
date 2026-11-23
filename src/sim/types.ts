@@ -10,8 +10,9 @@ export const S = {
   GUARD_BREAK: 33, HELD_ITEM: 34, BURN_T: 35, BURN_DPS: 36, RATE_LIMIT: 37,
   PERM_DMG: 38, PERM_ARMOR: 39, PERM_CHARGE: 40, PERM_COST: 41, PERM_MOT: 42, PERM_CDR: 43,
   LAST_SKILL: 44, HURT_IDLE: 45, MERGE: 46, REGEN_CUT: 47, AUTO_FULL: 48, TYPO: 49, NO_BURN_SLOW: 50, CRIT_NEXT: 51,
+  AIM_K: 52, AIM_X: 53, AIM_T: 54,
 } as const;
-export const N_ST = 52;
+export const N_ST = 55;
 export const N_RES = 24; // job resources; 12..23 are free for position history
 
 export interface Fighter {
@@ -72,4 +73,11 @@ export interface State {
   f: [Fighter, Fighter];
   ents: Entity[];
   items: Item[];
+  ot: number; // 1 during Overtime
+  otHp: [number, number]; // HP when Overtime started (first clean hit wins)
+  tiebreak: number; // 1 during the Production Incident tiebreaker round
+  hz: number[]; // arena hazard timers/values (8)
 }
+
+/** Entities owned by the arena (hazards) use this owner id. */
+export const ENV = 2;

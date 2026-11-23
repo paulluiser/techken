@@ -1,6 +1,6 @@
 // DevOps Engineer — "Automates the fight". Builder. GDD §3.7.
 import { ATK_STARTUP, sec, WALL_L, WALL_R } from "../constants";
-import { abs, addMot, basicDmg, buff, cancelActions, clamp, dealDamage, entBox, fighterBox, kill, oldestHistory, opp, overlap, ownEnts, pm, px, recordHistory, spawn } from "../core";
+import { targetX, abs, addMot, basicDmg, buff, cancelActions, clamp, dealDamage, entBox, fighterBox, kill, oldestHistory, opp, overlap, ownEnts, pm, px, recordHistory, spawn } from "../core";
 import { registerBeh, registerJob } from "../registry";
 import { K, S } from "../types";
 
@@ -33,10 +33,10 @@ registerJob({
             spawn(s, { k: K.ZONE, b: "do.conveyor", o: i, x: cx(f.x + f.facing * px(60)), y: f.y, w: 120, h: 6, life: sec(6), p1: f.facing });
             return true;
           } },
-        { name: "Push to Prod", cost: 3000, cd: sec(14), desc: "A container drops on them after 1 s: 100 dmg.",
+        { name: "Push to Prod", aim: true, cost: 3000, cd: sec(14), desc: "A container drops on them after 1 s: 100 dmg.",
           cast(s, i, pow) {
             const T = s.f[opp(i)];
-            spawn(s, { k: K.DELAYED, b: "do.drop", o: i, x: cx(T.x), y: T.y, w: 28, h: 30, life: 66, p1: pow });
+            spawn(s, { k: K.DELAYED, b: "do.drop", o: i, x: cx(targetX(s, i)), y: T.y, w: 28, h: 30, life: 66, p1: pow });
             return true;
           } },
       ],

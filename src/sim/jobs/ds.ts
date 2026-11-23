@@ -1,7 +1,7 @@
 // Data Scientist — "Probability". Ranged spread shots, seeded randomness. GDD §3.11.
 // All randomness comes from the state's RNG, so both players see the same rolls.
 import { sec } from "../constants";
-import { aimShot, dealDamage, entBox, fighterBox, kill, near, opp, overlap, ownEnts, pm, projStep, px, rndInt, spawn } from "../core";
+import { targetX, aimShot, dealDamage, entBox, fighterBox, kill, near, opp, overlap, ownEnts, pm, projStep, px, rndInt, spawn } from "../core";
 import { registerBeh, registerJob } from "../registry";
 import { K, S, type State } from "../types";
 
@@ -32,8 +32,8 @@ registerJob({
             aimShot(s, i, "ds.line", f.x, f.y - px(20), T.x + T.vx * 30, T.y + Math.min(0, T.vy) * 10 - px(18), px(7), pm(60, pow), 80, 8);
             return true;
           } },
-        { name: "Confidence Interval", cost: 3000, cd: sec(14), desc: "3 s band around them: every hit inside crits.",
-          cast(s, i) { const T = s.f[opp(i)]; spawn(s, { k: K.ZONE, b: "ds.ci", o: i, x: T.x, y: T.y + px(4), w: 70, h: 60, life: sec(3) }); return true; } },
+        { name: "Confidence Interval", aim: true, cost: 3000, cd: sec(14), desc: "3 s band around them: every hit inside crits.",
+          cast(s, i) { const T = s.f[opp(i)]; spawn(s, { k: K.ZONE, b: "ds.ci", o: i, x: targetX(s, i), y: T.y + px(4), w: 70, h: 60, life: sec(3) }); return true; } },
       ],
     },
     {

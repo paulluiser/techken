@@ -1,6 +1,6 @@
 // Technical Support — "Customers and tickets". Summoner/pressure. GDD §3.9.
 import { sec, WALL_L, WALL_R } from "../constants";
-import { addMot, dealDamage, entBox, fighterBox, kill, opp, overlap, ownEnts, pm, projStep, px, spawn, stun, walkerStep } from "../core";
+import { targetX, addMot, dealDamage, entBox, fighterBox, kill, opp, overlap, ownEnts, pm, projStep, px, spawn, stun, walkerStep } from "../core";
 import { registerBeh, registerJob } from "../registry";
 import { K, S, type Entity, type State } from "../types";
 
@@ -58,11 +58,10 @@ registerJob({
       skills: [
         { name: "Put on Hold", cost: 2500, cd: sec(10), desc: "3 s: no Motivation regen for them, their skills cost +10.",
           cast(s, i) { s.f[opp(i)].st[S.HOLD] = sec(3); return true; } },
-        { name: "Mass Ticket", cost: 3500, cd: sec(16), desc: "6 tickets rain on them over 2 s, 20 each.",
+        { name: "Mass Ticket", aim: true, cost: 3500, cd: sec(16), desc: "6 tickets rain on them over 2 s, 20 each.",
           cast(s, i, pow) {
-            const T = s.f[opp(i)];
             for (let k = 0; k < 6; k++) {
-              const x = Math.max(px(WALL_L + 8), Math.min(px(WALL_R - 8), T.x + (k - 2) * px(14) - px(7)));
+              const x = Math.max(px(WALL_L + 8), Math.min(px(WALL_R - 8), targetX(s, i) + (k - 2) * px(14) - px(7)));
               spawn(s, { k: K.PROJ, b: "ts.drop", o: i, x, y: -px(10 + k * 24), vx: 0, vy: px(5), w: 8, h: 8, life: 120, dmg: pm(20, pow) });
             }
             return true;

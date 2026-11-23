@@ -315,9 +315,8 @@ setInterval(async () => {
   el.style.color = st.desync ? "var(--danger)" : "";
 }, 250);
 
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden && driver.mode === "practice") show("s-menu");
-});
+// Vs CPU pauses while the tab is hidden (online can't pause; see the disconnect watchdog)
+document.addEventListener("visibilitychange", () => { driver.paused = document.hidden && driver.mode === "practice"; });
 
 // ---------- start ----------
 if (import.meta.env.DEV) (window as unknown as { techken: unknown }).techken = { driver, game: () => game, settings };

@@ -10,6 +10,7 @@ import {
   setOf, spendMot, stun,
 } from "./core";
 import { stepItems, throwInvite } from "./items";
+import { hazardPlatformOff, stepHazards } from "./hazards";
 import { IN_ATTACK, IN_DASH, IN_DOWN, IN_GUARD, IN_LEFT, IN_RIGHT, IN_SKILLS, IN_UP, type Input } from "./input";
 import { BEH } from "./registry";
 import { K, N_RES, N_ST, S, type Entity, type Fighter, type MatchConfig, type State } from "./types";
@@ -50,6 +51,7 @@ export function initState(cfg: MatchConfig = DEFAULT_CONFIG): State {
     cfg: { ...cfg, jobs: [cfg.jobs[0], cfg.jobs[1]], sets: [cfg.sets[0], cfg.sets[1]] },
     rng: (cfg.seed >>> 0) || 1, nextId: 1, itemT: C.ITEM_FIRST,
     f: [] as unknown as [Fighter, Fighter], ents: [], items: [],
+    ot: 0, otHp: [0, 0], tiebreak: 0, hz: new Array(8).fill(0),
   };
   initFighters(s);
   return s;
@@ -65,6 +67,8 @@ export function cloneState(s: State): State {
     f: [cloneF(s.f[0]), cloneF(s.f[1])],
     ents: s.ents.map((e) => ({ ...e })),
     items: s.items.map((it) => ({ ...it })),
+    otHp: [s.otHp[0], s.otHp[1]],
+    hz: s.hz.slice(),
   };
 }
 
@@ -92,6 +96,8 @@ export function checksum(s: State): number {
   for (const e of s.ents) { for (const k of ENT_KEYS) mix(e[k] as number); for (let c = 0; c < e.b.length; c++) mix(e.b.charCodeAt(c)); }
   mix(s.items.length);
   for (const it of s.items) { mix(it.id); mix(it.kind); mix(it.x); mix(it.y); mix(it.life); }
+  mix(s.ot); mix(s.otHp[0]); mix(s.otHp[1]); mix(s.tiebreak);
+  for (const v of s.hz) mix(v);
   return h >>> 0;
 }
 
@@ -173,7 +179,9 @@ function landOn(s: State, f: Fighter, prevY: number) {
   const land = (y: number) => { f.y = y; f.vy = 0; f.onGround = 1; f.jumpsLeft = jobOf(f).jumps - 1; };
   if (f.y >= floor) { land(floor); return; }
   if (f.dropThrough > 0) return;
-  for (const p of ARENAS[s.cfg.arena].platforms) {
+  for (let n = 0; n < ARENAS[s.cfg.arena].platforms.length; n++) {
+    if (hazardPlatformOff(s, n)) continue;
+    const p = ARENAS[s.cfg.arena].platforms[n];
     const py = px(p.y);
     if (f.x >= px(p.x1) && f.x <= px(p.x2) && prevY <= py && f.y >= py) { land(py); return; }
   }
@@ -233,7 +241,24 @@ function stepFighter(s: State, i: number, raw: Input) {
           if (f.st[S.AUTO_FULL] > 0) { f.st[S.AUTO_FULL]--; f.atkCharge = Math.max(f.atkCharge, chargeFull(s, i)); }
         }
       }
-      if (!f.charging && f.atk === 0) for (let k = 0; k < 3; k++) if (pressed & IN_SKILLS[k]) tryCast(s, i, k);
+      if (!f.charging && f.atk === 0) {
+        if (f.st[S.AIM_K] > 0) { // hold-to-aim: left/right moves the reticle, release casts
+          const k = f.st[S.AIM_K] - 1;
+          f.st[S.AIM_T]++;
+          const dir = (inp & IN_RIGHT ? 1 : 0) - (inp & IN_LEFT ? 1 : 0);
+          f.st[S.AIM_X] = Math.max(px(C.WALL_L + 12), Math.min(px(C.WALL_R - 12), f.st[S.AIM_X] + dir * px(3)));
+          if (!(inp & IN_SKILLS[k])) {
+            if (f.st[S.AIM_T] < 8) f.st[S.AIM_X] = other.x; // a tap is a smart cast on them
+            tryCast(s, i, k);
+            f.st[S.AIM_K] = 0; f.st[S.AIM_X] = 0; f.st[S.AIM_T] = 0;
+          }
+        } else {
+          for (let k = 0; k < 3; k++) if (pressed & IN_SKILLS[k]) {
+            if (setOf(f).skills[k]?.aim && f.cd[k] === 0) { f.st[S.AIM_K] = k + 1; f.st[S.AIM_X] = other.x; f.st[S.AIM_T] = 0; }
+            else tryCast(s, i, k);
+          }
+        }
+      }
       if ((pressed & IN_DASH) && f.dashCd === 0 && !f.charging && f.atk === 0 && f.st[S.ROOT] === 0) {
         if (spendMot(f, C.DASH_COST)) {
           f.dash = C.DASH_FRAMES;
@@ -246,7 +271,7 @@ function stepFighter(s: State, i: number, raw: Input) {
       f.charging = 0; f.charge = 0;
     }
     if (f.dash === 0 && f.atk === 0 && f.st[S.CAST] === 0) {
-      if (f.guarding) f.vx = 0;
+      if (f.guarding || f.st[S.AIM_K] > 0) f.vx = 0;
       else {
         const dir = (inp & IN_RIGHT ? 1 : 0) - (inp & IN_LEFT ? 1 : 0);
         f.vx = dir * moveSpeed(f);
@@ -347,10 +372,12 @@ function stepEntities(s: State) {
 }
 
 function resetRound(s: State) {
-  s.ents = []; s.items = []; s.itemT = C.ITEM_FIRST;
+  s.ents = []; s.items = []; s.itemT = C.ITEM_FIRST; s.ot = 0; s.hz = new Array(8).fill(0);
   initFighters(s);
-  s.timer = C.ROUND_FRAMES; s.phase = PHASE_FIGHT; s.phaseT = 0; s.roundWinner = -1;
+  s.timer = s.tiebreak ? C.sec(45) : C.ROUND_FRAMES; s.phase = PHASE_FIGHT; s.phaseT = 0; s.roundWinner = -1;
+  if (s.tiebreak) { s.f[0].hp = C.HP_MAX >> 1; s.f[1].hp = C.HP_MAX >> 1; }
 }
+export const OT_FRAMES = C.sec(15);
 
 /** Advance one frame. `inputs[0]` is player 1, `inputs[1]` is player 2. */
 export function step(s: State, inputs: readonly [Input, Input]) {
@@ -360,10 +387,11 @@ export function step(s: State, inputs: readonly [Input, Input]) {
     if (--s.phaseT <= 0) {
       if (s.phase === PHASE_ROUND_END) {
         if (s.wins[0] >= C.ROUNDS_TO_WIN || s.wins[1] >= C.ROUNDS_TO_WIN) {
+          if (s.wins[0] === s.wins[1] && !s.tiebreak) { s.tiebreak = 1; s.round++; resetRound(s); return; } // Production Incident
           s.phase = PHASE_MATCH_END; s.phaseT = C.MATCH_PAUSE;
           s.matchWinner = s.wins[0] === s.wins[1] ? 2 : s.wins[0] > s.wins[1] ? 0 : 1;
         } else { s.round++; resetRound(s); }
-      } else { s.wins = [0, 0]; s.round = 1; s.matchWinner = -1; resetRound(s); }
+      } else { s.wins = [0, 0]; s.round = 1; s.matchWinner = -1; s.tiebreak = 0; resetRound(s); }
     }
     return;
   }
@@ -372,16 +400,27 @@ export function step(s: State, inputs: readonly [Input, Input]) {
   stepFighter(s, 1, inputs[1]);
   resolveMelee(s);
   stepEntities(s);
-  stepItems(s);
+  if (s.cfg.hazards) stepHazards(s);
+  if (!s.ot && !s.tiebreak) stepItems(s);
   pushApart(s);
+  if (s.ot) { // Scope Creep: the walls close in
+    const shrink = px(Math.min(150, Math.trunc((OT_FRAMES - s.timer) / 6)));
+    for (const f of s.f) f.x = Math.max(px(C.WALL_L + 10) + shrink, Math.min(px(C.WALL_R - 10) - shrink, f.x));
+  }
 
   s.timer--;
   const ko0 = s.f[0].hp <= 0, ko1 = s.f[1].hp <= 0;
-  if (ko0 || ko1 || s.timer <= 0) {
+  // Overtime: the first clean hit wins
+  const otHit0 = s.ot && s.f[0].hp < s.otHp[0], otHit1 = s.ot && s.f[1].hp < s.otHp[1];
+  if (!s.ot && !ko0 && !ko1 && s.timer <= 0 && s.f[0].hp === s.f[1].hp) {
+    s.ot = 1; s.timer = OT_FRAMES; s.otHp = [s.f[0].hp, s.f[1].hp]; s.items = [];
+    return;
+  }
+  if (ko0 || ko1 || s.timer <= 0 || otHit0 || otHit1) {
     let w: number;
-    if (ko0 && ko1) w = 2;
-    else if (ko1) w = 0;
-    else if (ko0) w = 1;
+    if ((ko0 && ko1) || (otHit0 && otHit1)) w = 2;
+    else if (ko1 || otHit1) w = 0;
+    else if (ko0 || otHit0) w = 1;
     else w = s.f[0].hp === s.f[1].hp ? 3 : s.f[0].hp > s.f[1].hp ? 0 : 1;
     if (w === 0 || w === 2) s.wins[0]++;
     if (w === 1 || w === 2) s.wins[1]++;

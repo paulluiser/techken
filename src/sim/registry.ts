@@ -22,6 +22,7 @@ export interface SkillDef {
   tok?: number; // Vibe Coder tokens (hundredths)
   cd: number; // frames
   desc: string;
+  aim?: boolean; // "anywhere" skill: tap = smart cast on them, hold = aim with left/right
   /** Perform the skill. `pow` is a permille power multiplier (1000 = normal). */
   cast: (s: State, i: number, pow: number) => boolean;
 }

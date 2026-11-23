@@ -7,7 +7,8 @@ import { ITEMS } from "../sim/items";
 import { chargeFull, jobOf, motMax, setOf } from "../sim/core";
 import { JOB_CODES } from "../sim/registry";
 import { PHASE_FIGHT, PHASE_MATCH_END, PHASE_ROUND_END, type State } from "../sim/sim";
-import { K, S } from "../sim/types";
+import { ENV, K, S } from "../sim/types";
+import { OT_FRAMES } from "../sim/sim";
 import type { Driver } from "../game/driver";
 
 const FONT = '"Press Start 2P", monospace';
@@ -64,6 +65,25 @@ export class GameScene extends Phaser.Scene {
     }
     this.tArena.setText(this.driver.mode !== "attract" && s.timer > C.ROUND_FRAMES - 150 && s.phase === PHASE_FIGHT ? arena.name.toUpperCase() : "");
 
+    // hazards (visual)
+    if (s.cfg.hazards) {
+      const h = s.hz;
+      switch (arena.id) {
+        case "servers": if (h[2]) { g.fillStyle(0xff7a1a, 0.5); g.fillRect(180, arena.floor - 30, 24, 30); } g.fillStyle(0x59d3e8); g.fillRect(180, arena.floor, 24, 2); break;
+        case "basement": g.fillStyle(0x7cc24a, 0.35); g.fillRect(64, arena.floor - 3, 64, 3); g.fillRect(256, arena.floor - 3, 64, 3); break;
+        case "expo": g.fillStyle(0xfff1a8, 0.16); g.fillRect(h[1] - 25, 0, 50, arena.floor); break;
+        case "retreat": {
+          const fl = (s.frame >> 2) & 3;
+          g.fillStyle(0x6b4226); g.fillRect(310, arena.floor - 3, 16, 3);
+          g.fillStyle(0xe8432e); g.fillRect(312, arena.floor - 12 - fl, 12, 9 + fl);
+          g.fillStyle(0xffe066); g.fillRect(315, arena.floor - 8 - (fl & 1), 6, 5);
+          break;
+        }
+        case "cloud": if (h[1] > 0) { g.fillStyle(0xffffff, 0.25); for (let k = 0; k < 6; k++) g.fillRect(((s.frame * 4 * h[2] + k * 70) % 384 + 384) % 384, 40 + k * 24, 30, 1); } break;
+      }
+    }
+    if (s.cfg.hazards && arena.id === "retreat" && s.hz[3] > 0) { const p = arena.platforms[1]; g.fillStyle(arena.bg); g.fillRect(p.x1, p.y, p.x2 - p.x1, 6); }
+
     // items
     s.items.forEach((it, n) => {
       const d = ITEMS[it.kind], x = P(it.x), y = P(it.y) - 4 - ((s.frame >> 3) & 1);
@@ -80,7 +100,7 @@ export class GameScene extends Phaser.Scene {
 
     // entities
     for (const e of s.ents) {
-      const col = jobOf(s.f[e.o]).color;
+      const col = e.o === ENV ? 0xe9e6f2 : jobOf(s.f[e.o]).color;
       const x = P(e.x), y = P(e.y), w = e.w, h = e.h;
       switch (e.k) {
         case K.PROJ: g.fillStyle(0x1b1630); g.fillRect(x - (w >> 1) - 1, y - (h >> 1) - 1, w + 2, h + 2); g.fillStyle(e.b === "basic.shot" ? 0xffffff : col); g.fillRect(x - (w >> 1), y - (h >> 1), w, h); break;
@@ -150,6 +170,25 @@ export class GameScene extends Phaser.Scene {
       return true;
     });
 
+    // Overtime: the walls close in
+    if (s.ot) {
+      const shrink = Math.min(150, Math.trunc((OT_FRAMES - s.timer) / 6));
+      g.fillStyle(0xff4b3a, 0.35); g.fillRect(0, 0, C.WALL_L + shrink, C.H); g.fillRect(C.WALL_R - shrink, 0, C.W, C.H);
+    }
+    // aim reticle (only your own)
+    for (let i = 0; i < 2; i++) {
+      const f = s.f[i];
+      if (f.st[S.AIM_K] > 0 && (i === you || you === -1)) {
+        const ax = P(f.st[S.AIM_X]), ay = arena.floor;
+        g.fillStyle(0xffe066); g.fillRect(ax - 8, ay - 2, 16, 2); g.fillRect(ax - 1, ay - 40, 2, 38);
+        g.fillStyle(0xffe066, 0.15); g.fillRect(ax - 12, 0, 24, ay);
+      }
+    }
+    // darkness: Server Room outage, Hackathon lights dimming
+    if (s.cfg.hazards && arena.id === "servers" && s.hz[1] > 0) { g.fillStyle(0x000000, 0.82); g.fillRect(0, 0, C.W, C.H); }
+    if (s.cfg.hazards && arena.id === "hackathon") { g.fillStyle(0x000000, Math.min(0.55, (1 - s.timer / C.ROUND_FRAMES) * 0.6)); g.fillRect(0, 0, C.W, C.H); }
+    if (s.cfg.hazards && arena.id === "warroom" && s.hz[1] > 0 && (s.frame >> 3) & 1) { g.fillStyle(0xff0000, 0.18); g.fillRect(0, 0, C.W, C.H); }
+
     // HUD
     for (let i = 0; i < 2; i++) {
       const f = s.f[i], rtl = i === 1, job = jobOf(f), set = setOf(f);
@@ -186,7 +225,10 @@ export class GameScene extends Phaser.Scene {
     this.tTimer.setText(String(Math.max(0, Math.ceil(s.timer / 60))));
 
     let banner = "", sub = "";
-    if (s.phase === PHASE_FIGHT && s.timer > C.ROUND_FRAMES - 60) { banner = `ROUND ${s.round}`; sub = "DEPLOY!"; }
+    if (s.phase === PHASE_FIGHT && !s.ot && s.timer > (s.tiebreak ? C.sec(45) : C.ROUND_FRAMES) - 60) { banner = s.tiebreak ? "PRODUCTION INCIDENT" : `ROUND ${s.round}`; sub = s.tiebreak ? "50 % HP · 45 S · NO ITEMS" : "DEPLOY!"; }
+    if (s.phase === PHASE_FIGHT && s.ot && s.timer > OT_FRAMES - 90) { banner = "OVERTIME"; sub = "FIRST CLEAN HIT WINS"; }
+    if (s.phase === PHASE_FIGHT && s.cfg.hazards && arena.id === "warroom" && s.hz[1] > 0) sub = "PROD IS DOWN! −15 MOTIVATION";
+    if (s.phase === PHASE_FIGHT && s.cfg.hazards && arena.id === "garage" && s.hz[0] % C.sec(45) < 60 && s.hz[0] > 60) sub = "FUNDING ROUND!";
     if (s.phase === PHASE_ROUND_END) {
       banner = s.roundWinner === 3 ? "TIME" : s.roundWinner === 2 ? "DOUBLE K.O." : s.f[0].hp <= 0 || s.f[1].hp <= 0 ? "K.O." : "TIME";
       sub = s.roundWinner === 3 ? "DRAW, NO POINT" : s.roundWinner === 2 ? "BOTH SCORE" : `${this.who(s.roundWinner, you)} TAKES THE ROUND`;

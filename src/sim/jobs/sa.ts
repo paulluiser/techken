@@ -1,6 +1,6 @@
 // System Analyst — "Designs the battlefield". Area control. GDD §3.4.
 import { sec, WALL_L, WALL_R } from "../constants";
-import { clamp, dealDamage, dxPx, entBox, fighterBox, kill, opp, overlap, ownEnts, pm, px, segDistPx, slow, spawn, stun } from "../core";
+import { targetX, clamp, dealDamage, dxPx, entBox, fighterBox, kill, opp, overlap, ownEnts, pm, px, segDistPx, slow, spawn, stun } from "../core";
 import { JOBS, registerBeh, registerJob } from "../registry";
 import { K, S, type State } from "../types";
 
@@ -84,8 +84,8 @@ registerJob({
             f.vx = f.vy = T.vx = T.vy = 0;
             return true;
           } },
-        { name: "UML Box", cost: 3000, cd: sec(15), desc: "A class box around them. Still inside after 1 s: stunned 1 s.",
-          cast(s, i) { const T = s.f[opp(i)]; spawn(s, { k: K.DELAYED, b: "sa.uml", o: i, x: T.x, y: T.y + px(4), w: 44, h: 48, life: 64 }); return true; } },
+        { name: "UML Box", aim: true, cost: 3000, cd: sec(15), desc: "A class box around them. Still inside after 1 s: stunned 1 s.",
+          cast(s, i) { const T = s.f[opp(i)]; spawn(s, { k: K.DELAYED, b: "sa.uml", o: i, x: targetX(s, i), y: T.y + px(4), w: 44, h: 48, life: 64 }); return true; } },
         { name: "Gap Analysis", cost: 2500, cd: sec(10), desc: "Measure the gap. If they back off within 4 s: 70 dmg.",
           cast(s, i, pow) { const f = s.f[i]; f.res[1] = dxPx(f, s.f[opp(i)]); f.res[2] = sec(4); f.res[3] = pm(70, pow); return true; } },
       ],
