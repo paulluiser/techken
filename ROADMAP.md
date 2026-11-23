@@ -16,7 +16,7 @@ RNG in the state), so rollback netcode keeps working as content is added.
 | 3 | **Arena hazards** (13), Overtime, double-KO tiebreaker, aimed (hold) targeting for "anywhere" skills | ✅ done |
 | 4 | **TechkenOS menus**: Desktop, Employee Directory (blind pick, palettes), Meeting Room, VS screen, Post-Mortem, Control Panel (rebinding, touch layout editor), Swag Drawer | ✅ done |
 | 5 | **CPU AI**: 5 difficulty levels and per-job playbooks. Headless balance runner (CPU vs CPU win rates) | ✅ done: baseline in `design/balance-report.md` |
-| 6 | **Art**: chibi pixel sprites for 17 jobs (generated in the approved style), 5-layer backgrounds for 13 arenas, item icons, effects, portraits | ⏳ |
+| 6 | **Art**: chibi pixel sprites for 17 jobs (generated in the approved style), 5-layer backgrounds for 13 arenas, item icons, effects, portraits | ✅ done (preview: `/dev/sprites.html`, `/dev/arenas.html`) |
 | 7 | **Audio**: chip synth engine, 13 arena themes with Crunch stems, 17 job motifs, about 150 SFX, announcer text and lines, mixing rules, rollback-safe sound events | ⏳ |
 | 8 | **Single player**: Career ladder (rivals, Inbox Zero bonus stage, Legacy System and The Board bosses, scoring, endings), Training Room | ⏳ |
 | 9 | **Saves**: browser save, cosmetic unlocks, temporary names, transfer code and QR (`/api/transfer`) | ⏳ |

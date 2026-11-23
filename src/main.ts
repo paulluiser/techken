@@ -15,6 +15,7 @@ import { createLobby, fetchOffer, getIceServers, LobbyError, normalizeCode, post
 import { ACTIONS, keyLabel, loadSettings, randomGuest, resetSettings, saveSettings, validName, type ActionId } from "./ui/settings";
 import { META, PALETTES, paletteColor, paletteUnlocked } from "./ui/jobmeta";
 import { LEVELS } from "./ai/cpu";
+import { faceIcon, fullBodyIcon } from "./render/art/chibi";
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
 const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -156,9 +157,8 @@ function openDirectory(mode: PickMode, ready?: (p: Pick) => void) {
   let random = false;
   const render = () => {
     const k = settings.job, j = JOBS[k]!, m = META[k];
-    const col = paletteColor(j.color, settings.palette);
     const opp = mode === "practice"
-      ? (settings.cpu >= 0 ? `<div class="sprite"><div class="box" style="background:${hex(JOBS[settings.cpu]!.color)}"></div></div><p class="jobname">${esc(JOB_NAMES[settings.cpu])}</p>` : `<div class="sprite"><div class="mystery">?</div></div><p class="muted">Random CPU</p>`)
+      ? (settings.cpu >= 0 ? `<div class="sprite"><img class="body flip" src="${fullBodyIcon(settings.cpu)}" alt=""></div><p class="jobname">${esc(JOB_NAMES[settings.cpu])}</p>` : `<div class="sprite"><div class="mystery">?</div></div><p class="muted">Random CPU</p>`)
       : `<div class="sprite"><div class="mystery">?</div></div><p class="muted" id="opp-st">${net?.theirs ? "READY" : "choosing…"}</p><p class="muted">${esc(net?.them ?? "")}</p>`;
     const optsHtml = mode === "guest" ? "" : `<div class="row opts">
         <label>Arena <select id="o-arena">${ARENAS.map((a, n) => `<option value="${n}" ${n === settings.arena ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label>
@@ -171,13 +171,13 @@ function openDirectory(mode: PickMode, ready?: (p: Pick) => void) {
       <div class="dir">
         <div class="side"><h4>YOU · ${esc(settings.name)}</h4>
           ${random ? `<div class="sprite"><div class="mystery">?</div></div><p class="jobname">RANDOM</p>` :
-          `<div class="sprite"><div class="box" style="background:${hex(col)}"></div></div>
+          `<div class="sprite"><img class="body" src="${fullBodyIcon(k, settings.palette)}" alt=""></div>
           <p class="jobname">${esc(j.name)}</p><p class="muted">"${esc(m.tag)}" · ${esc(m.arch)} · ${"★".repeat(m.diff)}${"☆".repeat(4 - m.diff)}</p>
           ${statsHtml(k)}<p class="muted">${esc(m.weapon)} · charge ${(j.chargeFull / 60).toFixed(1)} s · ${j.tap}/${j.full}</p>`}
         </div>
         <div style="display:grid;gap:10px;min-width:0">
           <div class="pickgrid" role="listbox" aria-label="Jobs">
-            ${JOB_NAMES.map((n, idx) => `<button data-job="${idx}" title="${esc(n)}" aria-selected="${!random && idx === k}" style="background:${hex(JOBS[idx]!.color)}">${JOB_CODES[idx]}</button>`).join("")}
+            ${JOB_NAMES.map((n, idx) => `<button data-job="${idx}" title="${esc(n)}" aria-label="${esc(n)}" aria-selected="${!random && idx === k}" style="background:${hex(JOBS[idx]!.color)}"><img src="${faceIcon(idx, 0, hex(JOBS[idx]!.color))}" alt=""><span>${JOB_CODES[idx]}</span></button>`).join("")}
             <button class="rand" data-job="-1" aria-selected="${random}" title="Random job, set and palette">?</button>
           </div>
           ${random ? `<p class="muted">Job, set and palette are picked at random and revealed on the VS screen.</p>` : `<div class="sets">${setCardHtml(k, 0, settings.set === 0)}${setCardHtml(k, 1, settings.set === 1)}</div>
@@ -232,7 +232,7 @@ let lastPractice: Pick | null = null;
 function showVS(cfg: MatchConfig, names: [string, string], pals: [number, number], then: () => void) {
   const side = (i: 0 | 1) => {
     const j = JOBS[cfg.jobs[i]]!;
-    return `<div class="who"><span style="display:inline-block;width:64px;height:96px;border:4px solid #1b1630;background:${hex(paletteColor(j.color, pals[i]))};justify-self:${i ? "end" : "start"}"></span>${esc(names[i] || `P${i + 1}`)}<small>${esc(j.name)} · Set ${"AB"[cfg.sets[i]]} "${esc(j.sets[cfg.sets[i]].name)}"</small></div>`;
+    return `<div class="who"><img class="vsbody${i ? " flip" : ""}" src="${fullBodyIcon(cfg.jobs[i], pals[i])}" alt="" style="justify-self:${i ? "end" : "start"}">${esc(names[i] || `P${i + 1}`)}<small>${esc(j.name)} · Set ${"AB"[cfg.sets[i]]} "${esc(j.sets[cfg.sets[i]].name)}"</small></div>`;
   };
   ui.innerHTML = `<div class="vs" id="vs"><div class="half l">${side(0)}</div><div class="half r">${side(1)}</div><div class="bigvs">VS</div><div class="arena">${esc(ARENAS[cfg.arena].name.toUpperCase())}</div></div>`;
   onScreen = "vs";
@@ -610,7 +610,7 @@ function showSwag(tab: "profiles" | "titles" | "scores" = "profiles") {
     body = `<div class="profiles">${JOB_NAMES.map((n, k) => {
       const m = META[k], j = JOBS[k]!;
       const skills = j.sets.flatMap((s) => s.skills.map((x) => x.name)).slice(0, 4).join(", ");
-      return `<article class="profile"><header><span class="av" style="background:${hex(j.color)}"></span><div><b>${esc(n)}</b><div class="muted">"${esc(m.tag)}" · ${esc(m.arch)}</div></div></header>
+      return `<article class="profile"><header><img class="av" src="${faceIcon(k, 0, hex(j.color))}" alt=""><div><b>${esc(n)}</b><div class="muted">"${esc(m.tag)}" · ${esc(m.arch)}</div></div></header>
         <span>${esc(m.persona)} · ${esc(m.hair)}. ${esc(m.outfit)}.</span>
         <span class="muted">Skills: ${esc(skills)}…</span>
         <span class="endorse">Endorsed by ${2 + ((k * 7) % 9)} ${esc(JOB_NAMES[(k + 5) % 17])}s</span>

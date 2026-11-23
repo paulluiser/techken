@@ -168,3 +168,12 @@ table.pm th:first-child, table.pm td:first-child { text-align: left; color: var(
   #rotate { display: grid; place-items: center; position: absolute; inset: 0; z-index: 10; background: var(--bg); font-family: var(--f-display); font-size: 12px; text-align: center; padding: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { .vs .l, .vs .r { animation: none; } }
+
+/* generated pixel art in menus */
+.pickgrid button { padding: 2px 0 4px; display: grid; justify-items: center; gap: 1px; }
+.pickgrid button img { width: 100%; max-width: 48px; aspect-ratio: 1; image-rendering: pixelated; display: block; }
+.pickgrid button span { font-size: 7px; }
+.sprite img.body { width: 96px; height: 96px; image-rendering: pixelated; }
+img.flip { transform: scaleX(-1); }
+.vs img.vsbody { width: clamp(120px, 22vw, 240px); height: auto; aspect-ratio: 1; image-rendering: pixelated; }
+.profile img.av { width: 40px; height: 40px; image-rendering: pixelated; border: 2px solid #1b1630; }

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Techken · Sprite sheet (dev only)</title>
+  <style>
+    body { margin: 0; background: #12343b; color: #e9e4d4; font: 14px ui-monospace, monospace; padding: 12px; }
+    .row { display: flex; gap: 6px; align-items: end; margin-bottom: 4px; }
+    .row b { width: 150px; }
+    canvas { image-rendering: pixelated; width: 96px; height: 96px; background: #1d3f47; }
+  </style>
+</head>
+<body>
+  <div id="out"></div>
+  <script type="module">
+    import { fighterSprite } from "/src/render/art/chibi.ts";
+    import { JOB_NAMES } from "/src/sim/registry.ts";
+    const poses = ["idle0", "up", "swing", "guard", "pain", "burn"];
+    const pal = Number(new URLSearchParams(location.search).get("pal") ?? 0);
+    const out = document.getElementById("out");
+    JOB_NAMES.forEach((n, j) => {
+      const row = document.createElement("div"); row.className = "row";
+      row.innerHTML = `<b>${n}</b>`;
+      for (const p of poses) { const c = fighterSprite(j, pal, p, p === "burn" ? "gray" : ""); const k = document.createElement("canvas"); k.width = 48; k.height = 48; k.getContext("2d").drawImage(c, 0, 0); row.appendChild(k); }
+      out.appendChild(row);
+    });
+  </script>
+</body>
+</html>
