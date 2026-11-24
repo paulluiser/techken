@@ -167,15 +167,19 @@ export class CombinedInput {
   me: () => { x: number; y: number } | null = () => null;
   preview: AimPreview = { on: false, kind: "mouse", slot: 0, angle: 0, dist: 0 };
   readonly pad = new Pad();
+  /** Auto-aim for basic attacks (Control Panel → Controls). */
+  autoAttack: () => boolean = () => true;
   constructor(public kb: Keyboard, public touch: TouchControls, public auto: Autoplay) {}
   read(): number {
     if (this.auto.enabled) return this.auto.next();
     const t = this.touch.take(), p = this.pad.read();
     const buttons = this.kb.buttons() | t.buttons | p.buttons;
     const move = [this.kb.move(), p.move, t.move].find((m) => m >= 0) ?? -1;
-    let aim = t.aim >= 0 ? t.aim : p.aim, d = t.aim >= 0 ? t.dist : 0;
+    // auto attack aim: the mouse and right stick only aim skills, on the frame they're cast
+    const skillNow = (buttons & (IN_S1 | IN_S2 | IN_S3)) !== 0, freeAim = !this.autoAttack() || skillNow;
+    let aim = t.aim >= 0 ? t.aim : freeAim ? p.aim : -1, d = t.aim >= 0 ? t.dist : 0;
     this.preview = this.touch.preview.on ? this.touch.preview : { on: false, kind: "mouse", slot: 0, angle: 0, dist: 0 };
-    if (aim < 0 && this.kb.mouseAims && this.screenToFloor) {
+    if (aim < 0 && this.kb.mouseAims && this.screenToFloor && (freeAim || !this.autoAttack())) {
       const me = this.me(), at = this.screenToFloor(this.kb.mouse.x, this.kb.mouse.y);
       if (me && at) {
         aim = angleOf(at.x - me.x, at.y - me.y);

@@ -48,6 +48,18 @@ export const RANGED_PCT = 75;
 export const MELEE_PCT = 110;
 export const SHOT_LIFE = 28; // frames: about 7 tiles
 
+// Aim help (GAME_DESIGN.md 1.2): it runs in the sim so both online players see the same result.
+/** Manual aim within this many direction steps of the opponent (5 of 64 = about 28°) snaps onto them. */
+export const AIM_ASSIST = 5;
+/** Aim assist only works on opponents closer than this. */
+export const AIM_ASSIST_RANGE = 9000;
+/** Melee basics step in up to this far when the opponent is just out of reach. */
+export const STEP_IN = 500;
+/** Basic shots turn one direction step toward the opponent every this many frames (gentle homing). */
+export const SHOT_HOMING_EVERY = 3;
+/** Basic shots only home on targets within this many direction steps of their path. */
+export const SHOT_HOMING_CONE = 8;
+
 // Skills
 export const CAST_LOCK = 12;
 export const HARD_CC_MAX = sec(1.5);

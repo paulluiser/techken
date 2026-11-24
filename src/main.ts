@@ -37,6 +37,8 @@ const renderer = new Renderer($("#game"), driver, () => settings);
 input.screenToFloor = renderer.screenToFloor;
 input.me = () => { if (driver.mode === "attract") return null; const f = driver.state.f[driver.mode === "online" ? driver.me : 0]; return { x: f.x, y: f.y }; };
 renderer.aim = () => input.preview;
+input.autoAttack = () => settings.attackAim === "auto";
+renderer.autoAttack = () => settings.attackAim === "auto";
 renderer.hud.touchMode = isTouch;
 renderer.hud.touchButtons = touch.skillButtons;
 
@@ -245,7 +247,7 @@ function showPause() {
     </div>
     <h3 class="sec">${esc(KITS[f.job].name.toUpperCase())}</h3>
     ${kitCardHtml(f.job)}
-    <p class="muted">Hold Attack to charge, release to swing. Dash to dodge. Skills auto-aim; ${isTouch ? "drag a skill button to aim it" : "the mouse aims them"}.</p>`));
+    <p class="muted">Hold Attack to charge, release to swing: attacks lock onto your opponent. Dash to dodge. Skills auto-aim; ${isTouch ? "drag a skill button to aim it" : "the mouse aims them"}.</p>`));
   $("#p-resume", root)?.addEventListener("click", () => closeTo());
   $("#p-restart", root)?.addEventListener("click", () => { driver.paused = false; if (lastPractice) startPractice(lastPractice); });
   $("#p-cp", root).addEventListener("click", () => showControlPanel("controls", () => showPause()));
@@ -504,7 +506,9 @@ function showControlPanel(tab: CpTab = "controls", back?: () => void) {
   switch (tab) {
     case "audio": body = `${rng("v-master", settings.vol.master, "Master")}${rng("v-music", settings.vol.music, "Music")}${rng("v-sfx", settings.vol.sfx, "SFX")}${rng("v-ann", settings.vol.announcer, "Announcer")}
       ${chk("c-mono", settings.mono, "Mono audio")}${chk("c-muffle", settings.muffle, "Muffle music during my Burnout")}<p class="muted">Sound arrives in phase R7; these are saved now.</p>`; break;
-    case "controls": body = `<h3 class="sec">MOUSE</h3>${chk("k-mouse", settings.mouseAim, "Aim with the mouse (left click attacks, right click dashes)")}
+    case "controls": body = `<h3 class="sec">AIM</h3>${sel("k-aim", settings.attackAim, "Attack aim", [["auto", "Auto (attacks lock onto the opponent)"], ["manual", "Manual (mouse / right stick aims attacks)"]])}
+      <p class="muted">Skills always use the mouse or right stick when you aim them, and auto-aim when you don't. Manual aim gets a little help near the opponent.</p>
+      <h3 class="sec">MOUSE</h3>${chk("k-mouse", settings.mouseAim, "Aim skills with the mouse (left click attacks, right click dashes)")}
       <h3 class="sec">KEYBOARD</h3><div class="binds">${ACTIONS.map((a) => `<span>${a.label}</span><button data-bind="${a.id}" data-n="0">${esc(keyLabel(settings.keys[a.id][0] ?? "—"))}</button><button data-bind="${a.id}" data-n="1">${esc(keyLabel(settings.keys[a.id][1] ?? "—"))}</button>`).join("")}</div>
       <div class="row"><button class="btn" id="k-reset">RESET KEYS</button></div>
       <p class="muted">Gamepad: left stick moves, right stick aims, RT attacks, LT or A dashes, X / Y / B are skills 1-3.</p>
@@ -532,6 +536,7 @@ function showControlPanel(tab: CpTab = "controls", back?: () => void) {
   on("#v-sfx", "input", (e) => (settings.vol.sfx = +e.value)); on("#v-ann", "input", (e) => (settings.vol.announcer = +e.value));
   on("#c-mono", "change", (e) => (settings.mono = e.checked)); on("#c-muffle", "change", (e) => (settings.muffle = e.checked));
   on("#k-mouse", "change", (e) => (settings.mouseAim = e.checked));
+  on("#k-aim", "change", (e) => (settings.attackAim = e.value as "auto" | "manual"));
   on("#t-lefty", "change", (e) => (settings.touch.leftHanded = e.checked)); on("#t-size", "input", (e) => (settings.touch.size = +e.value)); on("#t-op", "input", (e) => (settings.touch.opacity = +e.value));
   on("#g-dmg", "change", (e) => (settings.dmgNumbers = e.checked)); on("#g-shake", "change", (e) => (settings.shake = e.checked)); on("#g-tips", "change", (e) => (settings.tips = e.checked));
   on("#d-q", "change", (e) => (settings.quality = e.value as "high" | "low"));

@@ -139,7 +139,19 @@ export function collide(s: State, x: number, y: number, r: number, owner = -1): 
 /** Where skill/basic i aims: the manual angle if the player is aiming, else straight at the opponent. */
 export function aimOf(s: State, i: number, inp: Input): number {
   const f = s.f[i], o = s.f[other(i)];
-  return hasAim(inp) ? aimAngle(inp) : angleOf(o.x - f.x, o.y - f.y, f.face);
+  const toOp = angleOf(o.x - f.x, o.y - f.y, f.face);
+  if (!hasAim(inp)) return toOp;
+  const a = aimAngle(inp);
+  // aim assist: close enough to the opponent snaps onto them
+  return targetable(o) && angleDiff(a, toOp) <= C.AIM_ASSIST && dist(f.x, f.y, o.x, o.y) <= C.AIM_ASSIST_RANGE ? toOp : a;
+}
+/** True when fighter i's attack is aimed at the opponent (auto-aim or snapped by aim assist). */
+export const aimsAtOpponent = (s: State, i: number, a: number) => { const f = s.f[i], o = s.f[other(i)]; return a === angleOf(o.x - f.x, o.y - f.y, f.face); };
+/** Angle to where the opponent will be when a shot at `speed` arrives (lead), capped at 20 frames ahead. */
+export function leadAngle(s: State, i: number, speed: number): number {
+  const f = s.f[i], o = s.f[other(i)];
+  const frames = Math.min(20, Math.trunc(dist(f.x, f.y, o.x, o.y) / Math.max(1, speed)));
+  return angleOf(o.x + (o.x - o.px) * frames - f.x, o.y + (o.y - o.py) * frames - f.y, f.face);
 }
 /** Target point for a "cast on a spot" skill, clamped to maxRange and the arena. */
 export function spotOf(s: State, i: number, inp: Input, defRange: number, maxRange: number): { x: number; y: number } {

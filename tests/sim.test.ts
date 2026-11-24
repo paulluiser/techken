@@ -195,3 +195,30 @@ describe("fixed-point math", () => {
     expect([angleOf(10, 0), angleOf(0, 10), angleOf(-10, 0), angleOf(0, -10)]).toEqual([0, 16, 32, 48]);
   });
 });
+
+describe("aim help", () => {
+  it("manual aim close to the opponent snaps onto them (aim assist)", () => {
+    const s = fight(); place(s, 1300);
+    run(s, KITS[SE].charge + 1, packInput(IN_ATTACK, -1, 3)); // aiming 3 steps off (about 17°)
+    step(s, [packInput(0, -1, 3), 0]);
+    expect(s.f[1].hp).toBeLessThan(C.HP_MAX);
+  });
+  it("manual aim far from the opponent stays where it points", () => {
+    const s = fight(); place(s, 1300);
+    run(s, KITS[SE].charge + 1, packInput(IN_ATTACK, -1, 32)); // aiming backwards
+    step(s, [packInput(0, -1, 32), 0]);
+    expect(s.f[1].hp).toBe(C.HP_MAX);
+  });
+  it("a melee swing steps in when the opponent is just out of reach", () => {
+    const s = fight(); place(s, 2300);
+    run(s, KITS[SE].charge + 1, packInput(IN_ATTACK, -1)); step(s, [0, 0]);
+    expect(s.f[1].hp).toBeLessThan(C.HP_MAX);
+  });
+  it("auto-aimed shots lead a moving target", () => {
+    const s = fight([10, SE]); place(s, 5000);
+    run(s, 30, packInput(IN_ATTACK, -1), packInput(0, 4)); // DS charges while SE walks down
+    step(s, [0, packInput(0, 4)]);
+    const shot = s.ents.find((e) => e.b === "basic.shot")!;
+    expect(shot.vy).toBeGreaterThan(0); // aimed below the target's current position
+  });
+});

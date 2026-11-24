@@ -63,6 +63,10 @@ export class Renderer {
   readonly hud: Hud;
   aim: () => AimPreview = () => ({ on: false, kind: "mouse", slot: 0, angle: 0, dist: 0 });
   private aimGuide: THREE.Mesh;
+  private lockRing: THREE.Mesh;
+  private reachRing: THREE.Mesh;
+  /** Basic attacks auto-aim (Control Panel → Controls → Attack aim). */
+  autoAttack: () => boolean = () => true;
   private aimSpot: THREE.Mesh;
 
   constructor(private host: HTMLElement, private driver: Driver, private settings: () => Settings) {
@@ -90,6 +94,10 @@ export class Renderer {
     this.aimSpot = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 32), new THREE.MeshBasicMaterial({ color: "#fff1a6", transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
     this.aimSpot.rotation.x = -Math.PI / 2;
     this.scene.add(this.aimGuide, this.aimSpot);
+    const flatRing = (inner: number, outer: number, color: string, op: number) => { const m = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 56), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; m.renderOrder = 2; return m; };
+    this.lockRing = flatRing(0.62, 0.78, "#ff5a4d", 0.9);
+    this.reachRing = flatRing(0.97, 1.0, "#ffffff", 0.7);
+    this.scene.add(this.lockRing, this.reachRing);
 
     addEventListener("resize", () => this.resize());
     this.resize();
@@ -328,9 +336,21 @@ export class Renderer {
   }
 
   private updateAim(s: State, local: number) {
-    const a = this.aim();
-    const f = local >= 0 ? s.f[local] : null;
-    const show = !!f && f.hp > 0 && (a.on && (a.kind !== "mouse" || f.charging === 1));
+    let a = this.aim();
+    const f = local >= 0 ? s.f[local] : null, o = local >= 0 ? s.f[1 - local] : null;
+    // lock-on ring under the opponent, and a reach circle while charging (green = the swing will land)
+    this.lockRing.visible = !!f && !!o && o.hp > 0 && o.air === 0;
+    if (this.lockRing.visible && o) { const w = this.world(s, o.x, o.y); this.lockRing.position.set(w.x, 0.06, w.z); this.lockRing.scale.setScalar(1 + 0.08 * Math.sin(s.frame * 0.25)); }
+    const melee = !!f && !KITS[f.job].ranged, impl = f ? IMPL[f.job] : undefined;
+    this.reachRing.visible = !!f && !!o && f.charging === 1 && melee && !!impl;
+    if (this.reachRing.visible && f && o && impl) {
+      const reach = impl.range + C.FIGHTER_R / 2, d = Math.hypot(o.x - f.x, o.y - f.y);
+      const w = this.world(s, f.x, f.y);
+      this.reachRing.position.set(w.x, 0.06, w.z); this.reachRing.scale.setScalar(reach / C.TILE);
+      (this.reachRing.material as THREE.MeshBasicMaterial).color.set(d <= reach + C.STEP_IN ? "#5fe08a" : "#ffffff");
+    }
+    if (f && o && f.charging && !melee && this.autoAttack() && !(a.on && a.kind === "attack")) a = { on: true, kind: "attack", slot: 0, angle: Math.round((Math.atan2(o.y - f.y, o.x - f.x) / (Math.PI * 2)) * 64 + 64) % 64, dist: 0 };
+    const show = !!f && f.hp > 0 && (a.on && (a.kind !== "mouse" || (f.charging === 1 && !this.autoAttack())));
     this.aimGuide.visible = show; this.aimSpot.visible = show && a.kind === "skill";
     if (!show || !f) return;
     const w = this.world(s, f.x, f.y), ang = angRad(a.angle), len = a.kind === "skill" ? Math.max(1, (a.dist * 500) / C.TILE) : 2.2;

@@ -77,7 +77,7 @@ JOBS = {
    skills=[("Firewall", "wall", 20, 10, 0, 0, 0, 40, "Wall in front, 4 s. Your shots pass."),
            ("Mirror", "self", 30, 10, 40, 0, 20, 0, "1 s. Reflects shots and melee damage."),
            ("Zero-Trust", "self", 40, 18, 50, 0, 70, 0, "Bubble, 3 s. Blocks 100, then explodes for 60+.")]),
- "Data Scientist": dict(role="Ranged", basic=("ranged", .8, 3 * 6, 3 * 20), speed=3,
+ "Data Scientist": dict(role="Ranged", basic=("ranged", .8, 3 * 6, 3 * 18), speed=3,
    passive=("Outlier", 2.4, "15% of hits crit for x1.5."),
    skills=[("Regression", "homing", 20, 7, 55, 0, 0, 0, "Shot aimed where they will be. 55 dmg."),
            ("Confidence Band", "zone", 30, 14, 40, 0, 0, 40, "Zone, 3 s. Every hit inside crits."),

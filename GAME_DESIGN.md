@@ -42,7 +42,11 @@
 - Each job has its own charge time (0.5–1.3 s) and damage (section 2).
 - You move at 60% speed while charging.
 - **Taps can't stop a charge.** Mid and full hits cancel it (not for Database Admin, whose charge can't be stopped at all). This keeps tap-spamming weak.
-- **Aim:** basics aim at the opponent when they're roughly in front of you, otherwise straight ahead. Melee hits an arc in front. Ranged fires a shot.
+- **Auto-aim (default):** basic attacks lock onto the opponent. A red ring under them shows the lock.
+  - **Melee:** while charging, a reach circle around you turns green when the swing will land. Just out of reach, the swing steps in up to half a tile.
+  - **Ranged:** shots aim where the opponent is heading and curve gently toward them.
+  - **Manual aim** (Control Panel → Controls) lets the mouse or right stick aim attacks. Aiming within about 28° of the opponent snaps onto them.
+- Skills auto-aim too, unless you aim them (mouse, right stick, or dragging the touch button).
 
 ### 1.3 Motivation and Burnout
 | Rule | Value |
@@ -92,7 +96,7 @@
 | 8 | Cloud Engineer | Artillery | Ranged, 23 / 72 dmg, 0.9 s charge | ●●● |
 | 9 | Technical Support | Summoner | Ranged, 16 / 50 dmg, 0.8 s charge | ●●● |
 | 10 | Cybersecurity Analyst | Defender | Melee, 26 / 80 dmg, 0.9 s charge | ●●● |
-| 11 | Data Scientist | Ranged | Ranged, 18 / 60 dmg, 0.8 s charge | ●●● |
+| 11 | Data Scientist | Ranged | Ranged, 18 / 54 dmg, 0.8 s charge | ●●● |
 | 12 | AI/ML Engineer | Summoner | Ranged, 17 / 52 dmg, 1.0 s charge | ●●● |
 | 13 | Business Analyst | Damage over time | Melee, 19 / 60 dmg, 0.8 s charge | ●●● |
 | 14 | Project Manager | Controller | Melee, 24 / 75 dmg, 1.0 s charge | ●●● |
@@ -620,7 +624,7 @@ Same 6 actions everywhere: **Move, Aim, Attack (hold), Dash, Skill 1, Skill 2, S
 - **Pets** always have HP, a timer and a max count. Area attacks break them.
 - **Every skill has an answer:** dash through it, break it, hide behind cover or punish the cooldown.
 - **CPU balance runner:** `npm run balance` plays every pair of jobs both ways (CPU vs CPU, Senior level) and writes `design/balance-report.md`.
-  - R2 result after 7 tuning passes: every job between **32 % and 67 %** (target 45–55 %, the R4 balance pass).
+  - After R2 and aim help: every job between **27 % and 68 %** (target 45–55 %, the R4 balance pass).
   - The runner replaced the paper model (`python3 design/kits_v3.py`), which only guided the first numbers.
 - **Global damage rules:** melee basics 110 %, ranged basics 75 % of listed damage. Taps can't interrupt a charge.
 - **Playtest targets:** rounds last 45–75 s, about 1–2 Burnouts per player per round.

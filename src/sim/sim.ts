@@ -6,9 +6,9 @@ import * as C from "./constants";
 import { ARENAS } from "./arenas";
 import { KITS } from "./data/kits.gen";
 import {
-  aimOf, aoe, BEH, canAct, IMPL, collide, dealDamage, fx, implOf, kitOf, moveEntity, other, pct, rand, spawn, spendMot, targetable, TAG, tickStatus,
+  aimOf, aimsAtOpponent, aoe, BEH, canAct, IMPL, leadAngle, len, collide, dealDamage, fx, implOf, kitOf, moveEntity, other, pct, rand, spawn, spendMot, targetable, TAG, tickStatus,
 } from "./core";
-import { angleDiff, angleOf, clamp, dist, dx, dy } from "./fixed";
+import { angleDiff, angleOf, clamp, dist, dx, dy, wrapA } from "./fixed";
 import { IN_ATTACK, IN_DASH, IN_SKILLS, moveAngle, type Input } from "./input";
 import "./jobs";
 import { FX, K, N_RES, N_ST, N_STATS, S, ST, type Entity, type Fighter, type MatchConfig, type State } from "./types";
@@ -26,6 +26,16 @@ export const DEFAULT_CONFIG: MatchConfig = { jobs: [0, 5], arena: 0, seed: 20261
 /** Ranged basics: a plain shot. mult = damage, n = 1 for a full charge. */
 Object.assign(BEH, {
   "basic.shot": {
+    step(s: State, e: Entity) { // gentle homing toward the opponent
+      if (e.t % C.SHOT_HOMING_EVERY !== 0) return;
+      const t = s.f[other(e.o)];
+      if (!targetable(t)) return;
+      const want = angleOf(t.x - e.x, t.y - e.y, e.a), diff = angleDiff(want, e.a);
+      if (diff === 0 || diff > C.SHOT_HOMING_CONE) return;
+      e.a = wrapA(e.a + (wrapA(want - e.a) < 32 ? 1 : -1));
+      const sp = len(e.vx, e.vy);
+      e.vx = dx(e.a, sp); e.vy = dy(e.a, sp);
+    },
     onHit(s: State, e: Entity, j: number) {
       dealDamage(s, e.o, j, e.mult, { basic: true, full: e.n === 1, light: e.n === 2, hitstun: e.n === 1 ? C.FULL_HITSTUN : C.TAP_HITSTUN, knockA: e.n === 1 ? angleOf(e.vx, e.vy) : undefined });
       return true;
@@ -98,7 +108,9 @@ function release(s: State, i: number, inp: Input) {
   const c = Math.min(f.charge, kit.charge);
   const full = c >= kit.charge, tap = c * 100 < kit.charge * C.TAP_PCT;
   const dmg = full ? kit.full : tap ? kit.tap : kit.tap + Math.trunc(((kit.full - kit.tap) * c) / kit.charge);
-  const a = aimOf(s, i, inp);
+  let a = aimOf(s, i, inp);
+  const locked = aimsAtOpponent(s, i, a);
+  if (kit.ranged && locked) a = leadAngle(s, i, impl.shotSpeed ?? C.SHOT_SPEED); // aim where they're going
   f.face = a; f.swing = C.SWING_FRAMES; f.swingFull = full ? 1 : 0; f.swingA = a;
   f.charging = 0; f.charge = 0;
   f.recovery = full ? C.FULL_RECOVERY : tap ? C.TAP_RECOVERY + Math.trunc(kit.charge / 3) : C.MID_RECOVERY;
@@ -119,7 +131,14 @@ function release(s: State, i: number, inp: Input) {
   }
   const o = s.f[other(i)];
   if (!targetable(o)) return;
-  const d = dist(f.x, f.y, o.x, o.y);
+  let d = dist(f.x, f.y, o.x, o.y);
+  // step in: just out of reach and aimed at them, the swing carries the fighter forward
+  const reach = impl.range + C.FIGHTER_R / 2;
+  if (locked && d > reach && d <= reach + C.STEP_IN) {
+    const c = collide(s, f.x + dx(a, d - reach + 120), f.y + dy(a, d - reach + 120), C.FIGHTER_R);
+    f.x = c.x; f.y = c.y;
+    d = dist(f.x, f.y, o.x, o.y);
+  }
   const inArc = angleDiff(angleOf(o.x - f.x, o.y - f.y, a), a) <= impl.arc;
   if (d <= impl.range + C.FIGHTER_R / 2 && (inArc || d <= C.FIGHTER_R * 2)) {
     dealDamage(s, i, other(i), pct(dmg, C.MELEE_PCT), { basic: true, full, light: tap, melee: true, hitstun: full ? C.FULL_HITSTUN : tap ? C.TAP_HITSTUN : 18, knockA: full ? a : undefined, interrupt: true });

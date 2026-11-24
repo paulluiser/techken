@@ -7,7 +7,7 @@ import { angleOf } from "../fixed";
 
 export const TW = 15;
 const impl: JobImpl = {
-  range: 5000, arc: 0, shotSpeed: 240, shotR: 240,
+  range: 5000, arc: 0, shotSpeed: 280, shotR: 240,
   ai: [[0, 6], [0, 5], [0, 6]],
   onLand(s, i, info) { if (info.basic && info.full) zone(s, i, "tw.ink", info.x, info.y, 1000, 300); },
   skills: [

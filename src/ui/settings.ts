@@ -23,6 +23,8 @@ export interface Settings {
   job: number; palette: number; arena: number; cpu: number; cpuLevel: number;
   // controls
   keys: Record<ActionId, string[]>; keysV: number; mouseAim: boolean;
+  /** "auto": basic attacks lock onto the opponent; the mouse/stick only aims skills. "manual": they aim attacks too. */
+  attackAim: "auto" | "manual";
   touch: { leftHanded: boolean; size: number; opacity: number; lx: number; ly: number; rx: number; ry: number };
   // audio (used from R7)
   vol: { master: number; music: number; sfx: number; announcer: number }; mono: boolean; muffle: boolean;
@@ -37,7 +39,7 @@ export const DEFAULTS: Settings = {
   name: "",
   delay: 2, lag: 0, jitter: 0, loss: 0, relay: false, auto: false, debug: false,
   job: 0, palette: 0, arena: 0, cpu: -1, cpuLevel: 3,
-  keys: defaultKeys(), keysV: KEYS_VERSION, mouseAim: true,
+  keys: defaultKeys(), keysV: KEYS_VERSION, mouseAim: true, attackAim: "auto",
   touch: { leftHanded: false, size: 100, opacity: 100, lx: 0, ly: 0, rx: 0, ry: 0 },
   vol: { master: 80, music: 70, sfx: 80, announcer: 80 }, mono: false, muffle: true,
   dmgNumbers: true, shake: true, tips: true, quality: "high",
