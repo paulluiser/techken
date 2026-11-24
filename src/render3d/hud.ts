@@ -7,8 +7,11 @@ import { keyLabel, type Settings } from "../ui/settings";
 
 /** Short glyphs shown on skill buttons, per job. Jobs without art yet show 1/2/3. */
 export const SKILL_GLYPHS: Record<number, [string, string, string]> = {
-  0: [";", "{ }", "↻"],
-  5: ["←", "LOCK", "DROP"],
+  0: [";", "{ }", "f()"], 1: ["SWIPE", "FLASH", "APP"], 2: ["ZOOM", "NET", "BUG"], 3: ["->", "LANE", "UML"],
+  4: ["PING", "LOSS", "(( ))"], 5: ["SEL", "LOCK", "DROP"], 6: ["BOX", "BELT", "PROD"], 7: ["RAIN", "HAIL", "ZAP"],
+  8: ["TIX", "HEY!", "MGR"], 9: ["WALL", "MIRR", "ZT"], 10: ["y=x", "CI", "DEL"], 11: ["BOT", "DRN", "LOOP"],
+  12: ["NOTE", "SCOPE", "DUE"], 13: ["TKT", "DDL", "FRZ"], 14: ["SNAP", "DRAG", "POP"], 15: ["RTFM", "TEXT", "XXX"],
+  16: ["TAB", "GEN", "YOLO"],
 };
 
 export interface HudInput {
@@ -22,7 +25,7 @@ export class Hud {
   readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   w = 0; h = 0; private dpr = 1;
-  private nums: { x: number; y: number; v: number; o: number; fr: number }[] = [];
+  private nums: { x: number; y: number; v: number; o: number; fr: number; crit: boolean }[] = [];
   private imgs = new Map<string, HTMLImageElement>();
   touchButtons: HTMLElement[] = [];
   touchMode = false;
@@ -39,7 +42,7 @@ export class Hud {
     this.canvas.style.width = `${w}px`; this.canvas.style.height = `${h}px`;
   }
   /** Queues a floating damage number at a sim position. */
-  number(x: number, y: number, v: number, o: number, fr: number) { this.nums.push({ x, y, v, o, fr }); if (this.nums.length > 30) this.nums.shift(); }
+  number(x: number, y: number, v: number, o: number, fr: number, crit = false) { this.nums.push({ x, y, v, o, fr, crit }); if (this.nums.length > 30) this.nums.shift(); }
 
   private img(url: string) {
     let im = this.imgs.get(url);
@@ -55,7 +58,7 @@ export class Hud {
     const cb = o.settings.colorblind;
     const sideColor = (i: number) => (o.local < 0 ? (i === 0 ? (cb ? "#3fb8ff" : "#5fe08a") : (cb ? "#ff9f1c" : "#ff7a6b")) : i === o.local ? (cb ? "#3fb8ff" : "#5fe08a") : (cb ? "#ff9f1c" : "#ff7a6b"));
 
-    const rr = (X: number, Y: number, W: number, H: number, r: number) => { x.beginPath(); x.roundRect(X, Y, W, H, r); };
+    const rr = (X: number, Y: number, W: number, H: number, r: number) => { x.beginPath(); x.roundRect(X, Y, Math.max(0, W), Math.max(0, H), Math.max(0, Math.min(r, W / 2, H / 2))); };
     const text = (t: string, X: number, Y: number, size: number, fill: string, align: CanvasTextAlign = "center", stroke = size * 0.18) => {
       x.font = `${size}px 'Lilita One', 'Arial Rounded MT Bold', sans-serif`; x.textAlign = align; x.textBaseline = "middle"; x.lineJoin = "round";
       x.lineWidth = stroke; x.strokeStyle = "#1a1636"; x.strokeText(t, X, Y); x.fillStyle = fill; x.fillText(t, X, Y);
@@ -112,14 +115,24 @@ export class Hud {
       if (f.st[S.SLOW_T] > 0) icons.push(["▼", "#3fb8ff"]);
       if (f.st[S.SILENCE] > 0) icons.push(["✕", "#a86bff"]);
       if (f.st[S.WEAK] > 0) icons.push(["↓", "#ff5a4d"]);
-      if (f.st[S.SHIELD] > 0) icons.push(["◆", "#7fe6ff"]);
+      if (f.st[S.SHIELD] > 0) icons.push([String(f.st[S.SHIELD]), "#7fe6ff"]);
+      if (f.st[S.WET] > 0) icons.push(["≈", "#5fb8ff"]);
+      if (f.st[S.DEBT] > 0) icons.push(["$" + f.st[S.DEBT], "#8bd45a"]);
+      if (f.st[S.TICKET] > 0) icons.push([String(Math.ceil(f.st[S.TICKET] / 60)), "#ff5d7a"]);
+      if (f.st[S.REFLECT] > 0) icons.push(["↺", "#ff8a3d"]);
+      if (f.st[S.CRIT_NEXT] > 0) icons.push(["✦", "#ffe27a"]);
+      if (f.st[S.SPD_T] > 0 && f.st[S.SPD_PCT] > 0) icons.push(["»", "#5fe08a"]);
       if (f.job === 0 && f.res[1]) icons.push(["{}", "#ffc63a"]); // Compiler ready
-      icons.forEach(([g, c], k) => {
-        const ix = hx + (k - (icons.length - 1) / 2) * 30 * u, iy = hy + 16 * u;
-        rr(ix - 13 * u, iy - 13 * u, 26 * u, 26 * u, 7 * u); x.fillStyle = "#1a1636"; x.fill();
-        rr(ix - 10 * u, iy - 10 * u, 20 * u, 20 * u, 5 * u); x.fillStyle = c; x.fill();
-        text(g, ix, iy + 1 * u, 14 * u, "#ffffff", "center", 3 * u);
-      });
+      const iw = (g: string) => Math.max(26, 12 + g.length * 9) * u;
+      const total = icons.reduce((a, [g]) => a + iw(g) + 4 * u, -4 * u);
+      let ix = hx - total / 2;
+      for (const [g, c] of icons) {
+        const wdt = iw(g), iy = hy + 16 * u;
+        rr(ix, iy - 13 * u, wdt, 26 * u, 7 * u); x.fillStyle = "#1a1636"; x.fill();
+        rr(ix + 3 * u, iy - 10 * u, wdt - 6 * u, 20 * u, 5 * u); x.fillStyle = c; x.fill();
+        text(g, ix + wdt / 2, iy + 1 * u, 14 * u, "#ffffff", "center", 3 * u);
+        ix += wdt + 4 * u;
+      }
     }
 
     // ---- damage numbers ----
@@ -127,7 +140,8 @@ export class Hud {
     for (const n of this.nums) {
       const p = (s.frame - n.fr) / 45, [nx, ny] = o.project(n.x, n.y, 2.0 + p * 1.2);
       x.globalAlpha = 1 - Math.max(0, p - 0.6) * 2.5;
-      const big = n.v >= 60;
+      const big = n.v >= 60 || n.crit;
+      if (n.crit) text("CRIT", nx, ny - 30 * u, 16 * u, "#ff9b4d", "center", 4 * u);
       text(String(n.v), nx, ny, (big ? 40 : 28) * u * (1 + (p < 0.15 ? (0.15 - p) * 3 : 0)), big ? "#ffd34d" : "#ffffff", "center", 6 * u);
       x.globalAlpha = 1;
     }

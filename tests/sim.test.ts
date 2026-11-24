@@ -6,6 +6,10 @@ import { angleOf, dist } from "../src/sim/fixed";
 import { IN_ATTACK, IN_DASH, IN_S1, IN_S2, IN_S3, packInput } from "../src/sim/input";
 import { checksum, cloneState, initState, PHASE_FIGHT, PHASE_INTRO, PHASE_ROUND_END, step, type State } from "../src/sim/sim";
 import { S } from "../src/sim/types";
+import { pct } from "../src/sim/core";
+/** Damage the Database Admin actually takes (Heavy). */
+const vsDba = (v: number) => pct(v, 95);
+const melee = (v: number) => pct(v, C.MELEE_PCT);
 import { SE } from "../src/sim/jobs/se";
 import { DBA, LEAP_FRAMES } from "../src/sim/jobs/dba";
 
@@ -65,13 +69,13 @@ describe("basic attacks", () => {
     const s = fight(); place(s, 1300);
     run(s, KITS[SE].charge + 1, packInput(IN_ATTACK, -1));
     step(s, [0, 0]);
-    expect(s.f[1].hp).toBe(C.HP_MAX - Math.trunc((KITS[SE].full * 90) / 100)); // DBA takes 10 % less
+    expect(s.f[1].hp).toBe(C.HP_MAX - vsDba(melee(KITS[SE].full)));
     expect(s.f[1].kT).toBeGreaterThan(0);
   });
   it("a tap deals tap damage", () => {
     const s = fight(); place(s, 1300);
     run(s, 3, packInput(IN_ATTACK, -1)); step(s, [0, 0]);
-    expect(s.f[1].hp).toBe(C.HP_MAX - Math.trunc((KITS[SE].tap * 90) / 100));
+    expect(s.f[1].hp).toBe(C.HP_MAX - vsDba(melee(KITS[SE].tap)));
   });
   it("misses when the target is out of reach", () => {
     const s = fight(); place(s, 4000);
@@ -106,19 +110,19 @@ describe("Software Engineer kit", () => {
     s.f[1].x = 12500; s.f[0].x = 11000; // close to the right wall so the shot bounces back through
     step(s, [packInput(IN_S3, -1), 0]);
     run(s, 180);
-    expect(C.HP_MAX - s.f[1].hp).toBe(Math.trunc((35 * 90) / 100) * 3);
+    expect(C.HP_MAX - s.f[1].hp).toBe(vsDba(40) * 3);
   });
-  it("Semicolon Strike closes the gap and hits for 50", () => {
+  it("Semicolon Strike closes the gap and hits for 50 (less Heavy)", () => {
     const s = fight(); place(s, 2600);
     step(s, [packInput(IN_S1, -1), 0]); run(s, 12);
-    expect(s.f[1].hp).toBe(C.HP_MAX - 45);
+    expect(s.f[1].hp).toBe(C.HP_MAX - vsDba(50));
   });
   it("Compiler: after 3 hits the next skill does +25%", () => {
     const s = fight(); place(s, 1300);
     s.f[0].res[1] = 1; // compiled
     place(s, 2600);
     step(s, [packInput(IN_S1, -1), 0]); run(s, 12);
-    expect(s.f[1].hp).toBe(C.HP_MAX - Math.trunc((Math.trunc((50 * 125) / 100) * 90) / 100));
+    expect(s.f[1].hp).toBe(C.HP_MAX - vsDba(pct(50, 125)));
   });
 });
 
@@ -129,17 +133,17 @@ describe("Database Admin kit", () => {
     expect(dist(s.f[0].x, s.f[0].y, s.f[1].x, s.f[1].y)).toBeLessThan(1400);
     expect(s.f[1].hp).toBe(C.HP_MAX - 30);
   });
-  it("DROP TABLE leaps to the target and lands for 130", () => {
+  it("DROP TABLE leaps to the target and lands for 100", () => {
     const s = fight([DBA, SE]); place(s, 4000);
     step(s, [packInput(IN_S3, -1), 0]);
     expect(s.f[0].air).toBeGreaterThan(0);
     run(s, LEAP_FRAMES + 1);
-    expect(s.f[1].hp).toBe(C.HP_MAX - 130);
+    expect(s.f[1].hp).toBe(C.HP_MAX - 100);
   });
   it("Table Lock stuns a target next to you", () => {
     const s = fight([DBA, SE]); place(s, 1400);
     step(s, [packInput(IN_S2, -1), 0]);
-    expect(s.f[1].st[S.STUN]).toBe(C.sec(1.2));
+    expect(s.f[1].st[S.STUN]).toBe(C.sec(1));
   });
 });
 

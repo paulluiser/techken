@@ -17,7 +17,7 @@ the touch-control editor and the TechkenOS menu shell.
 | Phase | Scope | Status |
 |---|---|---|
 | R1 | **Top-down core**: floor-plane movement, wall and cover collision, dash, charged basics (melee arc and ranged shot), aim input (mouse, right stick, touch drag, auto-aim). three.js renderer with stand-in chibis. **Software Engineer and Database Admin** in Open Office and The Terminal. Works online | ✅ done. CPU mirror win rates SE vs DBA: 25 % (Mid-level), 60 % (Principal), to fix in R4 |
-| R2 | **All 17 kits** (1 passive + 3 skills each, `design/kits_v3.py`): shots, dashes, delayed areas, zones, walls, pets, the 10 effect words with over-head icons | ⏳ |
+| R2 | **All 17 kits** (1 passive + 3 skills each, `design/kits_v3.py`): shots, dashes, delayed areas, zones, walls, pets, the 10 effect words with over-head icons | ✅ done. CPU win rates 32–67 % (`design/balance-report.md`) |
 | R3 | **Arenas and items**: 13 top-down layouts with cover and hazards, the 14 items, Overtime shrink | ⏳ |
 | R4 | **CPU AI and balance**: 5 levels re-tuned for top-down (dodging, cover), playbooks per kit, CPU-vs-CPU runner until every job is 45–55% | ⏳ |
 | R5 | **Simple menus**: fewer words, icon-first. Quick 3-step tutorial (move, charge, skill). Roster stage, kit view with one line per skill | ⏳ |

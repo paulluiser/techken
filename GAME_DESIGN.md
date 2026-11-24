@@ -85,20 +85,22 @@
 | 1 | Software Engineer | All-rounder | Melee, 22 / 70 dmg, 0.8 s charge | ●●● |
 | 2 | Mobile Developer | Hit-and-run | Melee, 16 / 50 dmg, 0.6 s charge | ●●●● |
 | 3 | QA Analyst | Debuffer | Melee, 19 / 58 dmg, 0.7 s charge | ●●● |
-| 4 | System Analyst | Area control | Melee, 26 / 80 dmg, 1.0 s charge | ●●● |
+| 4 | System Analyst | Area control | Melee, 26 / 80 dmg, 0.9 s charge | ●●● |
 | 5 | Network Admin | Zoner | Ranged, 22 / 70 dmg, 1.0 s charge | ●● |
-| 6 | Database Admin | Tank | Melee, 35 / 110 dmg, 1.3 s charge | ● |
-| 7 | DevOps Engineer | Builder | Melee, 24 / 75 dmg, 0.9 s charge | ●●● |
-| 8 | Cloud Engineer | Artillery | Melee, 23 / 72 dmg, 0.9 s charge | ●●● |
+| 6 | Database Admin | Tank | Melee, 28 / 88 dmg, 1.3 s charge | ● |
+| 7 | DevOps Engineer | Builder | Melee, 24 / 72 dmg, 0.8 s charge | ●●● |
+| 8 | Cloud Engineer | Artillery | Ranged, 23 / 72 dmg, 0.9 s charge | ●●● |
 | 9 | Technical Support | Summoner | Ranged, 16 / 50 dmg, 0.8 s charge | ●●● |
-| 10 | Cybersecurity Analyst | Defender | Melee, 22 / 68 dmg, 0.9 s charge | ●● |
+| 10 | Cybersecurity Analyst | Defender | Melee, 26 / 80 dmg, 0.9 s charge | ●●● |
 | 11 | Data Scientist | Ranged | Ranged, 18 / 60 dmg, 0.8 s charge | ●●● |
 | 12 | AI/ML Engineer | Summoner | Ranged, 17 / 52 dmg, 1.0 s charge | ●●● |
 | 13 | Business Analyst | Damage over time | Melee, 19 / 60 dmg, 0.8 s charge | ●●● |
 | 14 | Project Manager | Controller | Melee, 24 / 75 dmg, 1.0 s charge | ●●● |
-| 15 | UI/UX Designer | Rushdown | Melee, 13 / 42 dmg, 0.5 s charge | ●●●●● |
-| 16 | Technical Writer | Trapper | Ranged, 18 / 55 dmg, 0.8 s charge | ●●● |
-| 17 | Vibe Coder | Burst | Ranged, 15 / 46 dmg, 0.6 s charge | ●●●● |
+| 15 | UI/UX Designer | Rushdown | Melee, 15 / 46 dmg, 0.5 s charge | ●●●●● |
+| 16 | Technical Writer | Trapper | Ranged, 15 / 48 dmg, 0.8 s charge | ●●● |
+| 17 | Vibe Coder | Burst | Ranged, 13 / 40 dmg, 0.7 s charge | ●●● |
+
+Melee basics deal 110 % of the listed damage and ranged basics 75 % (they're safer). Ranged shots fly about 7 tiles.
 
 **Matchup wheel (rough):** rushdown beats zoners, zoners beat tanks, tanks beat rushdown. Summoners lose to area attacks (DROP TABLE, Remove Outliers, Broadcast Storm).
 
@@ -134,7 +136,7 @@ Basic: melee, charge 0.8 s, 22 / 70 dmg · Speed ●●●
 | Passive | **Compiler** | | Every 3rd hit: next skill +25% damage. |
 | S1 | **Semicolon Strike** | 20 / 6 s | Dash forward. 50 dmg. Interrupts. |
 | S2 | **Brace Cage** | 30 / 12 s | Braces snap shut on a spot. Stun 1.2 s. |
-| S3 | **Recursion** | 40 / 16 s | Shot that bounces off walls. Hits 3 times, 35 each. |
+| S3 | **Recursion** | 40 / 16 s | Shot that bounces off walls. Hits 3 times, 40 each. |
 
 ### 2. Mobile Developer · Hit-and-run
 Basic: melee, charge 0.6 s, 16 / 50 dmg · Speed ●●●●
@@ -142,9 +144,9 @@ Basic: melee, charge 0.6 s, 16 / 50 dmg · Speed ●●●●
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
 | Passive | **Two Bars** | | 2 dash charges. |
-| S1 | **Swipe** | 20 / 6 s | Dash through them. 45 dmg. |
+| S1 | **Swipe** | 20 / 6 s | Dash through them. 50 dmg. |
 | S2 | **Camera Flash** | 30 / 12 s | Flash cone. 45 dmg, slow 30% for 2 s. |
-| S3 | **Deploy to Device** | 40 / 18 s | Phone turret, 6 s. Shoots 15 dmg/s. |
+| S3 | **Deploy to Device** | 40 / 18 s | Phone turret, 6 s. Shoots 15 dmg every 0.8 s. |
 
 ### 3. QA Analyst · Debuffer
 Basic: melee, charge 0.7 s, 19 / 58 dmg · Speed ●●●
@@ -152,17 +154,17 @@ Basic: melee, charge 0.7 s, 19 / 58 dmg · Speed ●●●
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
 | Passive | **Found a Bug** | | Every 4th hit: Weak for 4 s. |
-| S1 | **Magnify** | 20 / 7 s | Beam. 40 dmg and Weak for 4 s. |
+| S1 | **Magnify** | 20 / 7 s | Beam. 45 dmg and Weak for 4 s. |
 | S2 | **Bug Net** | 30 / 12 s | Thrown net. 30 dmg, Root 1 s. |
 | S3 | **Release the Bug** | 40 / 18 s | Bug pet, 8 s. Chases, bites, slows. |
 
 ### 4. System Analyst · Area control
-Basic: melee, charge 1.0 s, 26 / 80 dmg · Speed ●●●
+Basic: melee, charge 0.9 s, 26 / 80 dmg · Speed ●●●
 
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
 | Passive | **Critical Path** | | +25% damage to stunned or rooted targets. |
-| S1 | **Arrow Connector** | 20 / 6 s | Blink to a spot. 40 dmg on the way. |
+| S1 | **Arrow Connector** | 20 / 6 s | Blink to a spot. 50 dmg on the way. |
 | S2 | **Swimlane** | 30 / 12 s | Wall for 5 s. Blocks moves and shots. |
 | S3 | **UML Box** | 40 / 18 s | Box drops on a spot. 40 dmg, stun 1.5 s. |
 
@@ -171,40 +173,40 @@ Basic: ranged, charge 1.0 s, 22 / 70 dmg · Speed ●●
 
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
-| Passive | **Access Point** | | Router at start. +20% damage near it. |
-| S1 | **Ping** | 20 / 5 s | Fast shot. 35 dmg, slow 20% for 1.5 s. |
+| Passive | **Access Point** | | Router at start. +15% damage near it. |
+| S1 | **Ping** | 20 / 5 s | Fast shot. 30 dmg, slow 20% for 1.5 s. |
 | S2 | **Packet Loss** | 30 / 14 s | Zone, 5 s. Deletes enemy shots. Enemies deal -30%. |
-| S3 | **Broadcast Storm** | 40 / 18 s | 3 rings burst out from you. 45 each. |
+| S3 | **Broadcast Storm** | 40 / 18 s | 3 rings burst out from you. 40 each. |
 
 ### 6. Database Admin · Tank
-Basic: melee, charge 1.3 s, 35 / 110 dmg · Speed ●
+Basic: melee, charge 1.3 s, 28 / 88 dmg · Speed ●
 
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
-| Passive | **Heavy** | | Can't be interrupted while charging. Take 10% less damage. |
+| Passive | **Heavy** | | Can't be interrupted while charging. Take 5% less damage. |
 | S1 | **SELECT** | 20 / 7 s | Hook. Pulls them to you. 30 dmg. |
-| S2 | **Table Lock** | 30 / 13 s | Slam next to you. Stun 1.2 s. |
-| S3 | **DROP TABLE** | 40 / 20 s | Leap to a spot. 130 dmg. Breaks summons. |
+| S2 | **Table Lock** | 30 / 13 s | Slam next to you. Stun 1 s. |
+| S3 | **DROP TABLE** | 40 / 22 s | Leap to a spot. 100 dmg. Breaks summons. |
 
 ### 7. DevOps Engineer · Builder
-Basic: melee, charge 0.9 s, 24 / 75 dmg · Speed ●●●
+Basic: melee, charge 0.8 s, 24 / 72 dmg · Speed ●●●
 
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
-| Passive | **Pipeline** | | Every 3 skills: 5 s of +20% speed. |
-| S1 | **Container** | 20 / 9 s | Drop a crate wall (150 HP). |
-| S2 | **Conveyor** | 30 / 13 s | Belt, 6 s. Pushes enemies your way. |
-| S3 | **Push to Prod** | 40 / 16 s | Crate falls on a spot after 1 s. 120 dmg. |
+| Passive | **Pipeline** | | Every 3 skills: 5 s of +20% speed and +15% damage. |
+| S1 | **Container** | 20 / 9 s | Crate lands on a spot. 40 dmg, then it's a wall. |
+| S2 | **Conveyor** | 30 / 13 s | Belt, 6 s. Pulls enemies your way and slows them. |
+| S3 | **Push to Prod** | 40 / 16 s | Crate falls on a spot after 0.6 s. 130 dmg. |
 
 ### 8. Cloud Engineer · Artillery
-Basic: melee, charge 0.9 s, 23 / 72 dmg · Speed ●●●
+Basic: ranged, charge 0.9 s, 23 / 72 dmg · Speed ●●●
 
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
 | Passive | **Elastic** | | Dash goes 50% farther. |
-| S1 | **Rain Cloud** | 20 / 7 s | Rain on a spot, 3 s. 25 dmg/s. Makes them Wet. |
-| S2 | **Cold Start** | 30 / 12 s | Hail on a spot. 40 dmg, slow 40% for 2 s. |
-| S3 | **Lightning** | 40 / 16 s | Strike a spot. 100 dmg, 200 if Wet. |
+| S1 | **Rain Cloud** | 20 / 6 s | Rain on a spot, 3 s. 25 dmg/s. Slows, makes them Wet. |
+| S2 | **Cold Start** | 30 / 10 s | Hail on a spot. 50 dmg, slow 40% for 2 s. |
+| S3 | **Lightning** | 40 / 14 s | Strike a spot. 100 dmg, 200 if Wet. |
 
 ### 9. Technical Support · Summoner
 Basic: ranged, charge 0.8 s, 16 / 50 dmg · Speed ●●●
@@ -212,19 +214,19 @@ Basic: ranged, charge 0.8 s, 16 / 50 dmg · Speed ●●●
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
 | Passive | **Hold Music** | | Enemies near your customers: slow 15%. |
-| S1 | **Ticket Fan** | 20 / 6 s | 3 tickets in a fan. 20 each. |
-| S2 | **Angry Customer** | 30 / 12 s | Customer pet, 8 s. Chases and shoves. Max 2. |
-| S3 | **Escalate** | 40 / 20 s | Turns a customer into a Manager. Slam stuns 0.8 s. |
+| S1 | **Ticket Fan** | 20 / 6 s | 3 tickets in a fan. 12 each. |
+| S2 | **Angry Customer** | 30 / 12 s | Customer pet, 6 s. Chases and shoves. Max 2. |
+| S3 | **Escalate** | 40 / 20 s | Turns a customer into a Manager. Slam stuns 0.5 s. |
 
 ### 10. Cybersecurity Analyst · Defender
-Basic: melee, charge 0.9 s, 22 / 68 dmg · Speed ●●
+Basic: melee, charge 0.9 s, 26 / 80 dmg · Speed ●●●
 
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
-| Passive | **Hardened** | | Every 5 s untouched: +30 shield (max 90). |
+| Passive | **Hardened** | | Every 4 s untouched: +30 shield (max 120). |
 | S1 | **Firewall** | 20 / 10 s | Wall in front, 4 s. Your shots pass. |
-| S2 | **Mirror** | 30 / 14 s | 1 s. Reflects shots and half of melee. |
-| S3 | **Zero-Trust** | 40 / 18 s | Bubble, 3 s. Blocks 100, then explodes. |
+| S2 | **Mirror** | 30 / 10 s | 1 s. Reflects shots and melee damage. |
+| S3 | **Zero-Trust** | 40 / 18 s | Bubble, 3 s. Blocks 100, then explodes for 60+. |
 
 ### 11. Data Scientist · Ranged
 Basic: ranged, charge 0.8 s, 18 / 60 dmg · Speed ●●●
@@ -232,7 +234,7 @@ Basic: ranged, charge 0.8 s, 18 / 60 dmg · Speed ●●●
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
 | Passive | **Outlier** | | 15% of hits crit for x1.5. |
-| S1 | **Regression** | 20 / 7 s | Shot aimed where they will be. 50 dmg. |
+| S1 | **Regression** | 20 / 7 s | Shot aimed where they will be. 55 dmg. |
 | S2 | **Confidence Band** | 30 / 14 s | Zone, 3 s. Every hit inside crits. |
 | S3 | **Remove Outliers** | 40 / 18 s | Big blast. 90 dmg. Deletes summons and traps. |
 
@@ -242,7 +244,7 @@ Basic: ranged, charge 1.0 s, 17 / 52 dmg · Speed ●●●
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
 | Passive | **Learning** | | Your bot levels up as it hits (max 3). |
-| S1 | **Deploy Bot** | 25 / 10 s | Bot pet, 12 s (150 HP). Bites 12 dmg/s. |
+| S1 | **Deploy Bot** | 25 / 10 s | Bot pet, 12 s (150 HP). Bites 16 dmg/s. |
 | S2 | **Drones** | 30 / 13 s | 2 drones orbit you, 6 s. They shoot with you. |
 | S3 | **Agentic Loop** | 40 / 18 s | All your pets rush them. +50% damage, 4 s. |
 
@@ -254,7 +256,7 @@ Basic: melee, charge 0.8 s, 19 / 60 dmg · Speed ●●●
 | Passive | **Interest** | | Each hit adds Debt (max 8). Debt deals 2 dmg/s each. |
 | S1 | **Sticky Note** | 20 / 6 s | Shot. 20 dmg, +3 Debt. |
 | S2 | **Scope Creep** | 30 / 13 s | Growing zone, 5 s. +1 Debt/s, slow 20%. |
-| S3 | **Due Date** | 40 / 20 s | Cash in all Debt. 20 dmg each. |
+| S3 | **Due Date** | 40 / 20 s | Cash in all Debt. 25 dmg each. |
 
 ### 14. Project Manager · Controller
 Basic: melee, charge 1.0 s, 24 / 75 dmg · Speed ●●●
@@ -267,34 +269,34 @@ Basic: melee, charge 1.0 s, 24 / 75 dmg · Speed ●●●
 | S3 | **Code Freeze** | 40 / 18 s | Shot. 30 dmg, Stun 1.4 s. |
 
 ### 15. UI/UX Designer · Rushdown
-Basic: melee, charge 0.5 s, 13 / 42 dmg · Speed ●●●●●
+Basic: melee, charge 0.5 s, 15 / 46 dmg · Speed ●●●●●
 
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
 | Passive | **Flow State** | | Each hit in a row: +5% speed (max 25%). |
 | S1 | **Grid Snap** | 20 / 6 s | Blink. Your next hit crits. |
-| S2 | **Drag & Drop** | 30 / 12 s | Grab and throw. 40 dmg, +20 and stun into a wall. |
-| S3 | **Make It Pop** | 40 / 16 s | 5 fast stabs, 16 each. |
+| S2 | **Drag & Drop** | 30 / 12 s | Grab and throw. 50 dmg, +20 and stun into a wall. |
+| S3 | **Make It Pop** | 40 / 16 s | 5 fast stabs, 20 each. |
 
 ### 16. Technical Writer · Trapper
-Basic: ranged, charge 0.8 s, 18 / 55 dmg · Speed ●●●
+Basic: ranged, charge 0.8 s, 15 / 48 dmg · Speed ●●●
 
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
 | Passive | **Track Changes** | | Full-charge hits leave ink: you +15% speed, them -15%. |
-| S1 | **RTFM** | 20 / 7 s | Heavy manual. 65 dmg, knockback. |
+| S1 | **RTFM** | 20 / 7 s | Heavy manual. 60 dmg, knockback. |
 | S2 | **Paragraph** | 30 / 12 s | Text wall, 6 s. Blocks moves and shots. |
 | S3 | **Redact** | 40 / 18 s | Black bar on a spot. 40 dmg, Silence 2 s. |
 
 ### 17. Vibe Coder · Burst
-Basic: ranged, charge 0.6 s, 15 / 46 dmg · Speed ●●●●
+Basic: ranged, charge 0.7 s, 13 / 40 dmg · Speed ●●●
 
 | | Skill | Cost / CD | What it does |
 |---|---|---|---|
 | Passive | **Context Window** | | First skill after 6 s of no skills: +30% damage. |
-| S1 | **Autocomplete** | 20 / 5 s | Homing shot. 35 dmg. |
-| S2 | **Generate** | 30 / 10 s | Big blast. 85 dmg. |
-| S3 | **YOLO Deploy** | 40 / 18 s | Explode around you. 150 dmg. You take 50. |
+| S1 | **Autocomplete** | 20 / 5 s | Homing shot. 25 dmg. |
+| S2 | **Generate** | 30 / 10 s | Big blast. 60 dmg. |
+| S3 | **YOLO Deploy** | 40 / 18 s | Explode around you. 100 dmg. You take 50. |
 
 ---
 
@@ -617,9 +619,10 @@ Same 6 actions everywhere: **Move, Aim, Attack (hold), Dash, Skill 1, Skill 2, S
 - **Caps:** Stun and Root max 1.5 s, then 1 s immune. Slow max 40%. Silence max 2 s.
 - **Pets** always have HP, a timer and a max count. Area attacks break them.
 - **Every skill has an answer:** dash through it, break it, hide behind cover or punish the cooldown.
-- **Paper model:** `python3 design/kits_v3.py` scores every kit's power per second.
-  - v0.3 spread: **−3.6% to +4.4%** around the median (the v0.2 side-view kits were −13% to +11%).
-  - The model is a starting point. Once the new sim runs, CPU-vs-CPU win rates replace it (target: every job 45–55%).
+- **CPU balance runner:** `npm run balance` plays every pair of jobs both ways (CPU vs CPU, Senior level) and writes `design/balance-report.md`.
+  - R2 result after 7 tuning passes: every job between **32 % and 67 %** (target 45–55 %, the R4 balance pass).
+  - The runner replaced the paper model (`python3 design/kits_v3.py`), which only guided the first numbers.
+- **Global damage rules:** melee basics 110 %, ranged basics 75 % of listed damage. Taps can't interrupt a charge.
 - **Playtest targets:** rounds last 45–75 s, about 1–2 Burnouts per player per round.
 
 ---

@@ -18,11 +18,6 @@ export const LEVELS: Level[] = [
   { name: "Principal", react: 8, dodge: 0.85, fullCharge: 0.95, skill: 0.92, reserve: 3000 },
 ];
 
-/** When each skill is worth using: min/max distance to the opponent (tiles). */
-const SKILL_RANGE: Record<number, [number, number][]> = {
-  0: [[1.4, 3.6], [0, 6], [0, 8]], // Software Engineer
-  5: [[2.2, 5.8], [0, 1.6], [1.8, 5]], // Database Admin
-};
 
 export interface CpuMem {
   rng: number; wait: number; move: number; want: number; // want: charge frames to reach before releasing
@@ -48,6 +43,7 @@ export function cpuInput(s: State, i: number, level: number, m: CpuMem): number 
   let threatA = -1, threatId = 0;
   for (const e of s.ents) {
     if (e.o === i) continue;
+    if (e.t0 - e.t < L.react) continue; // the CPU needs its reaction time to notice a new shot or warning
     if (e.k === K.PROJ) {
       const rx = me.x - e.x, ry = me.y - e.y, closing = rx * e.vx + ry * e.vy;
       if (closing <= 0 || dist(0, 0, rx, ry) > 4 * T) continue;
@@ -55,34 +51,51 @@ export function cpuInput(s: State, i: number, level: number, m: CpuMem): number 
       if (cross < e.r + C.FIGHTER_R + 250) { threatA = angleOf(e.vx, e.vy) + (r01(m) < 0.5 ? 16 : -16); threatId = e.id; }
     } else if (e.k === K.DELAYED && dist(me.x, me.y, e.x, e.y) < e.r + C.FIGHTER_R) {
       threatA = angleOf(me.x - e.x, me.y - e.y, toOp + 32); threatId = e.id;
+    } else if (e.k === K.RING && e.n === 0 && Math.abs(dist(me.x, me.y, e.x, e.y) - e.r) < 700 && !e.hitCd) {
+      threatA = toOp + 16; threatId = e.id; // a ring is about to pass: dash through it
+    } else if (e.k === K.ZONE && threatA < 0 && dist(me.x, me.y, e.x, e.y) < e.r + C.FIGHTER_R) {
+      threatA = angleOf(me.x - e.x, me.y - e.y, toOp + 32); // walk out of enemy zones
     }
   }
   if (op.air > 0 && dist(me.x, me.y, op.ax1, op.ay1) < 2200) { threatA = angleOf(me.x - op.ax1, me.y - op.ay1, toOp + 32); threatId = -op.air0 - s.round * 1000; }
   if (threatId && !m.threats.includes(threatId)) {
     m.threats.push(threatId); if (m.threats.length > 8) m.threats.shift();
-    if (r01(m) < L.dodge && me.dashCd === 0 && me.mot > C.DASH_COST + 500) return packInput(IN_DASH, dir16(threatA));
+    if (r01(m) < L.dodge && me.dashN > 0 && me.mot > C.DASH_COST + 500) return packInput(IN_DASH, dir16(threatA));
   }
   if (threatA >= 0 && L.dodge > 0.3) move = threatA;
 
   // 2. skills, checked at reaction speed
-  if (--m.wait <= 0) {
+  const free = me.recovery === 0 && me.cast === 0 && me.hitstun === 0 && me.burnout === 0 && me.st[S.STUN] === 0 && me.lunge === 0;
+  if (--m.wait <= 0 && free) {
     m.wait = L.react + Math.floor(r01(m) * L.react);
-    const ranges = SKILL_RANGE[me.job] ?? [[0, 3], [0, 6], [0, 6]];
+    const ranges = impl.ai;
     const punish = op.st[S.STUN] > 0 || op.burnout > 0;
     for (let k = 2; k >= 0; k--) {
       const [lo, hi] = ranges[k];
       if (me.cd[k] > 0 || d < lo * T || d > hi * T || me.charging) continue;
       if (me.mot < kit.skills[k].cost + (punish ? 0 : L.reserve)) continue;
+      if (impl.aiWhen && !impl.aiWhen(s, i, k)) continue;
       if (r01(m) < L.skill) return packInput(IN_SKILLS[k], dir16(toOp));
     }
     m.want = r01(m) < L.fullCharge || op.burnout > 0 || op.st[S.STUN] > 0 ? kit.charge : Math.floor(kit.charge * 0.2);
     m.strafe = r01(m) < 0.5 ? 1 : -1;
   }
 
+  // 2b. an enemy pet nearby and the opponent far: swat the pet first
+  let petA = -1;
+  if (!kit.ranged || d > 5500) {
+    let best = 2600;
+    for (const e of s.ents) if (e.k === K.PET && e.o !== i && e.hp > 0) { const pd = dist(me.x, me.y, e.x, e.y); if (pd < best && d > 3000) { best = pd; petA = angleOf(e.x - me.x, e.y - me.y); } }
+  }
+  if (petA >= 0 && L.dodge > 0.15) {
+    if (me.charging && me.charge >= Math.min(m.want, kit.charge >> 1)) return packInput(0, dir16(petA), petA);
+    return packInput(me.recovery === 0 ? IN_ATTACK : 0, dir16(petA), petA);
+  }
+
   // 3. basic attack: charge while closing in, release in range
-  const reach = impl.range + C.FIGHTER_R / 2 - 150;
+  const reach = kit.ranged ? 5200 : impl.range + C.FIGHTER_R / 2 - 150;
   const opImpl = IMPL[op.job], opKit = KITS[op.job];
-  const opReach = (opImpl?.range ?? 1500) + C.FIGHTER_R / 2;
+  const opReach = opKit.ranged ? 0 : (opImpl?.range ?? 1500) + C.FIGHTER_R / 2; // ranged charges aren't a "step back" threat
   const opOpen = op.recovery > 0 || op.burnout > 0 || op.st[S.STUN] > 0 || op.cast > 0; // a free hit
   // patience: a long standoff (nobody getting hit) makes the CPU commit for a while
   const hpSum = me.hp + op.hp;
@@ -98,7 +111,7 @@ export function cpuInput(s: State, i: number, level: number, m: CpuMem): number 
   else if (me.recovery === 0 && me.burnout === 0 && d < reach + 3 * T) buttons |= IN_ATTACK;
 
   // a big charge is about to land: smart CPUs dash out of it
-  if (danger && op.charge >= opKit.charge - 8 && d < opReach + 200 && L.dodge > 0.3 && me.dashCd === 0 && me.mot > C.DASH_COST + 500 && !ready) {
+  if (danger && op.charge >= opKit.charge - 8 && d < opReach + 200 && L.dodge > 0.3 && me.dashN > 0 && me.mot > C.DASH_COST + 500 && !ready) {
     const id = -(s.frame - op.charge) - 7; // one roll per opponent charge
     if (!m.threats.includes(id)) { m.threats.push(id); if (r01(m) < L.dodge) return packInput(IN_DASH, dir16(toOp + 32 + 8 * m.strafe)); }
   }
@@ -106,6 +119,9 @@ export function cpuInput(s: State, i: number, level: number, m: CpuMem): number 
   // 4. movement: close the distance, keep out of a charging opponent's reach, strafe, detour around cover
   if (move < 0) {
     if (me.burnout > 0) move = toOp + 32; // back off while burnt out
+    else if (kit.ranged && m.commit === 0 && d < 3200 && !opOpen) move = toOp + 32 + 10 * m.strafe; // ranged: keep the distance
+    else if (impl.aiKeep && m.commit === 0 && d < impl.aiKeep * T && !opOpen && me.cd.some((c) => c === 0)) move = toOp + 32 + 10 * m.strafe; // artillery: back off while skills are ready
+    else if (kit.ranged && d < 5200 && d > 3000) move = toOp + 16 * m.strafe; // ranged: strafe at range
     else if (danger && !ready && L.dodge > 0.15) move = toOp + 32 + 6 * m.strafe; // step back, wait for the whiff
     else if (opOpen || d > reach - 200) move = toOp;
     else if (m.commit === 0 && L.dodge > 0.3 && reach > opReach + 100 && d < opReach + 150) move = toOp + 32; // keep them at the edge of our longer reach

@@ -5,13 +5,14 @@ import { ARENAS } from "../sim/arenas";
 import { IMPL } from "../sim/core";
 import { KITS } from "../sim/data/kits.gen";
 import { cosA, sinA } from "../sim/fixed";
-import { FX, K, S, type Fighter, type State } from "../sim/types";
+import { FX, S, type Fighter, type State } from "../sim/types";
 import type { Driver } from "../game/driver";
 import type { AimPreview } from "../game/input-sources";
 import type { Settings } from "../ui/settings";
 import { buildArena } from "./arena3d";
 import { buildChibi, lookFor, type Chibi } from "./models";
 import { Hud } from "./hud";
+import { EntityArt, JOB_ACCENT, type EntView } from "./entities3d";
 
 const TAU = Math.PI * 2;
 /** Stand-in chibis are about 2.2 units tall; this keeps them readable next to 1-tile-wide hitboxes. */
@@ -47,7 +48,8 @@ export class Renderer {
   private arenaKey = "";
   private arenaGroup: THREE.Group | null = null;
   private views: (FighterView | null)[] = [null, null];
-  private ents = new Map<number, { obj: THREE.Object3D; b: string; line?: THREE.Line }>();
+  private ents = new Map<number, EntView & { b: string }>();
+  private art: EntityArt;
   private fxSeen = new Set<string>();
   private transients: Transient[] = [];
   private shake = 0;
@@ -70,6 +72,7 @@ export class Renderer {
     this.gl.toneMapping = THREE.ACESFilmicToneMapping; this.gl.toneMappingExposure = 1.0;
     this.gl.shadowMap.enabled = q === "high"; this.gl.shadowMap.type = THREE.PCFShadowMap;
     host.appendChild(this.gl.domElement);
+    this.art = new EntityArt(this.scene, this.glowTex, textTexture);
     this.hud = new Hud(host);
 
     this.scene.add(new THREE.HemisphereLight("#fff4e6", "#5a52b8", 1.6));
@@ -187,6 +190,7 @@ export class Renderer {
     const slashMat = new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
     const slashMesh = new THREE.Mesh(new THREE.RingGeometry(0.55, range, 24, 1, -arc, 2 * arc), slashMat); slashMesh.rotation.x = -Math.PI / 2;
     const slash = new THREE.Group(); slash.add(slashMesh); slash.position.y = 0.6; this.scene.add(slash);
+    slash.visible = !KITS[f.job].ranged;
     const spr = (tex: THREE.Texture, color: string, size: number, additive = true) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color, transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending })); sp.scale.set(size, size, 1); return sp; };
     const glow = spr(this.glowTex, "#ffd34d", 2.2); glow.position.y = 1.2; chibi.root.add(glow);
     const stars = spr(textTexture("★", "#ffe14d"), "#ffffff", 0.8, false); stars.position.y = 2.75; chibi.root.add(stars);
@@ -262,59 +266,19 @@ export class Renderer {
     v.trail.forEach((t, n) => { t.visible = f.dash > 0 || f.iframes > 4; t.position.set(w.x - (cosA(f.dashA) / 1024) * (n + 1) * 0.45, 1.0 + y, w.z - (sinA(f.dashA) / 1024) * (n + 1) * 0.45); (t.material as THREE.SpriteMaterial).opacity = 0.5 - n * 0.11; });
   }
 
-  private clearEnts() { for (const e of this.ents.values()) this.scene.remove(e.obj); this.ents.clear(); }
-
-  private makeEntity(b: string, owner: number): { obj: THREE.Object3D; line?: THREE.Line } {
-    const g = new THREE.Group();
-    const spr = (color: string, size: number) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); sp.scale.set(size, size, 1); return sp; };
-    switch (b) {
-      case "se.recursion": {
-        g.add(spr("#ffd34d", 1.6));
-        g.add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), new THREE.MeshBasicMaterial({ color: "#fff6c9" })));
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.05, 8, 24), new THREE.MeshBasicMaterial({ color: "#c08bff" })); ring.name = "spin"; g.add(ring);
-        g.position.y = 1.0; break;
-      }
-      case "db.hook": {
-        const head = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.4, 12), new THREE.MeshStandardMaterial({ color: "#9fb0d0", metalness: 0.6, roughness: 0.3 }));
-        head.rotation.z = -Math.PI / 2; head.name = "head"; g.add(head); g.add(spr("#6fb8ff", 0.9));
-        g.position.y = 1.0;
-        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: "#c9d6f0" }));
-        this.scene.add(line);
-        return { obj: g, line };
-      }
-      case "se.cage": {
-        const flat = (geo: THREE.BufferGeometry, color: string, op: number) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; return m; };
-        const edge = flat(new THREE.RingGeometry(1.0, 1.12, 48), owner === 0 ? "#ffd34d" : "#ffb04d", 0.9);
-        const fill = flat(new THREE.CircleGeometry(1.0, 48), "#ffd34d", 0.25); fill.name = "fill";
-        const l = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture("{", "#ffd34d"), transparent: true, depthWrite: false })); l.scale.set(1.1, 1.1, 1); l.name = "l";
-        const r = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture("}", "#ffd34d"), transparent: true, depthWrite: false })); r.scale.set(1.1, 1.1, 1); r.name = "r";
-        g.add(edge, fill, l, r); g.position.y = 0.05; break;
-      }
-      default: g.add(spr(owner === 0 ? "#7dffcf" : "#ffb38a", 0.9)); g.position.y = 1.0;
-    }
-    return { obj: g };
-  }
+  private clearEnts() { for (const e of this.ents.values()) { this.scene.remove(e.obj); if (e.line) this.scene.remove(e.line); } this.ents.clear(); }
 
   private updateEntities(s: State) {
     const seen = new Set<number>();
     for (const e of s.ents) {
       seen.add(e.id);
       let ev = this.ents.get(e.id);
-      if (!ev) { const m = this.makeEntity(e.b, e.o); ev = { ...m, b: e.b }; this.ents.set(e.id, ev); this.scene.add(m.obj); }
+      if (ev && ev.b !== e.b) { this.scene.remove(ev.obj); if (ev.line) this.scene.remove(ev.line); ev = undefined; } // e.g. a customer became a Manager
+      if (!ev) { const m = this.art.make(e, s.f[e.o].job); ev = { ...m, b: e.b }; this.ents.set(e.id, ev); this.scene.add(m.obj); }
       const w = this.world(s, e.x, e.y);
       ev.obj.position.x = w.x; ev.obj.position.z = w.z;
-      const spin = ev.obj.getObjectByName("spin"); if (spin) spin.rotation.set(s.frame * 0.2, s.frame * 0.3, 0);
-      if (e.b === "db.hook") {
-        const head = ev.obj.getObjectByName("head")!; head.rotation.y = -Math.atan2(e.vy, e.vx);
-        const o = this.world(s, s.f[e.o].x, s.f[e.o].y);
-        ev.line!.geometry.setFromPoints([new THREE.Vector3(o.x, 1.0, o.z), new THREE.Vector3(w.x, 1.0, w.z)]);
-      }
-      if (e.k === K.DELAYED) {
-        const p = 1 - e.t / e.t0;
-        const fill = ev.obj.getObjectByName("fill"); if (fill) fill.scale.setScalar(Math.max(0.05, p));
-        const l = ev.obj.getObjectByName("l"), r = ev.obj.getObjectByName("r");
-        if (l && r) { const off = 1.4 * (1 - p) + 0.3; l.position.set(-off, 0.8, 0); r.position.set(off, 0.8, 0); }
-      }
+      ev.tick?.(s, e, w);
+      if (ev.line) { const o = this.world(s, s.f[e.o].x, s.f[e.o].y); ev.line.geometry.setFromPoints([new THREE.Vector3(o.x, 1.0, o.z), new THREE.Vector3(w.x, 1.0, w.z)]); }
     }
     for (const [id, ev] of this.ents) if (!seen.has(id)) { this.scene.remove(ev.obj); if (ev.line) this.scene.remove(ev.line); this.ents.delete(id); }
   }
@@ -343,6 +307,9 @@ export class Renderer {
       const w = this.world(s, e.x, e.y);
       switch (e.k) {
         case FX.DMG: if (this.settings().dmgNumbers) this.hud.number(e.x, e.y, e.v, e.o, s.frame); break;
+        case FX.CRIT: if (this.settings().dmgNumbers) this.hud.number(e.x, e.y, e.v, e.o, s.frame, true); this.burst(w.x, w.z, "#ffe27a", 8, 0.9); break;
+        case FX.BLAST: this.wave(w.x, w.z, JOB_ACCENT[s.f[e.o].job] ?? "#ffffff", Math.max(0.6, e.v / C.TILE), 18); break;
+        case FX.BREAK: this.burst(w.x, w.z, "#c9c6d8", 10, 0.8, 22); break;
         case FX.SPARK: this.burst(w.x, w.z, e.v === 2 ? "#ffe27a" : "#ffffff", e.v === 2 ? 10 : 5, e.v === 2 ? 0.9 : 0.6); if (e.v === 2) this.shake = Math.max(this.shake, 1.2); break;
         case FX.SPLAT: this.wave(w.x, w.z, "#ffffff", 2.2); this.shake = Math.max(this.shake, 2); break;
         case FX.LAND: this.wave(w.x, w.z, "#ff9a3d", 2.4, 26); this.burst(w.x, w.z, "#ffcf8a", 10, 1); this.shake = Math.max(this.shake, 2.5); break;
@@ -351,7 +318,7 @@ export class Renderer {
         case FX.SKILL:
           if (e.v === 2) { this.wave(w.x, w.z, "#ffd34d", 1.3, 16); this.burst(w.x, w.z, "#ffd34d", 8, 0.8); }
           else if (e.v === 1) { this.wave(w.x, w.z, "#ff9a3d", 2.0, 18); this.shake = Math.max(this.shake, 1.2); }
-          else this.wave(w.x, w.z, s.f[e.o].job === 0 ? "#c08bff" : "#6fb8ff", 0.9, 14);
+          else if (e.v >= 10) this.wave(w.x, w.z, JOB_ACCENT[s.f[e.o].job] ?? "#ffffff", 0.9, 14);
           break;
         case FX.KO: this.shake = 3; break;
       }

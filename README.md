@@ -3,8 +3,8 @@
 A 1v1 **top-down arena fighter** where every fighter is a tech job. Browser game, no login.
 
 **Build status:** see `ROADMAP.md`. The game is being rebuilt as a top-down fighter (v0.3).
-**R1 is done:** the top-down core with the **Software Engineer** and the **Database Admin**,
-playable vs CPU (5 levels) and online. The other 15 jobs arrive in R2.
+**R2 is done:** all **17 jobs** are playable vs CPU (5 levels) and online, each with one kit
+(a passive and 3 skills). Balance across jobs is tracked by `npm run balance` (`design/balance-report.md`).
 
 **What's in it**
 - **Deterministic sim** (`src/sim/`): integer-only, 60 ticks/s, 64-direction fixed-point math.
@@ -61,6 +61,7 @@ npm test
 |---|---|
 | `tests/sim.test.ts` | Determinism, cloning, movement and walls, dash, charged basics, both R1 kits, Burnout, round flow and Overtime |
 | `tests/rollback.test.ts` | Two sessions over a simulated network (up to ~200 ms jitter, 20 % loss, 30 seeds). They must never desync, and must end on the exact state of a plain simulation with the same inputs |
+| `tests/kits.test.ts` | Every one of the 51 skills has an effect, plus Debt, tickets, Mirror, Packet Loss, wet Lightning, throws, walls, pets, crits and per-job determinism |
 | `tests/cpu.test.ts` | CPU matches finish, Principal beats Intern, rounds last a sensible time |
 | `tests/lobby.test.ts` | The handshake, the "meeting is full" rule, code validation and rate limiting |
 

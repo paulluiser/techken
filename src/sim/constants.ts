@@ -41,7 +41,12 @@ export const KNOCK_SPEED = 150;
 export const KNOCK_FRAMES = 12;
 export const WALL_SPLAT = 24;
 export const SWING_FRAMES = 12; // render-only swing animation length
-export const SHOT_SPEED = 260; // ranged basics (from R2)
+export const SHOT_SPEED = 260; // ranged basics
+/** Ranged basics deal this percent of the kit's listed damage: safe damage from range is worth less. */
+export const RANGED_PCT = 75;
+/** Melee basics deal this percent of the kit's listed damage: getting close is a risk worth paying for. */
+export const MELEE_PCT = 110;
+export const SHOT_LIFE = 28; // frames: about 7 tiles
 
 // Skills
 export const CAST_LOCK = 12;
