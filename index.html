@@ -8,34 +8,23 @@
   <title>Techken</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Lilita+One&display=swap">
 </head>
 <body>
   <div id="app">
     <div id="game" aria-label="Game screen"></div>
-    <div id="crt" hidden></div>
-
+    
     <div id="touch" hidden>
-      <div class="pad left" id="pad-move">
-        <button data-bit="1" aria-label="Move left">◀</button>
-        <button data-bit="8" aria-label="Down / drop through">▼</button>
-        <button data-bit="2" aria-label="Move right">▶</button>
-      </div>
+      <div id="pad-move"><div id="stick-zone" aria-label="Move: touch and drag"><div id="stick" hidden><div class="knob"></div></div></div></div>
       <div class="pad right" id="pad-act">
-        <div class="skills">
-          <button data-bit="128" class="small" aria-label="Skill 1">S1</button>
-          <button data-bit="256" class="small" aria-label="Skill 2">S2</button>
-          <button data-bit="512" class="small" aria-label="Skill 3">S3</button>
-        </div>
-        <div class="main">
-          <button data-bit="64" class="small" aria-label="Guard">GRD</button>
-          <button data-bit="32" class="small" aria-label="Dash">DASH</button>
-          <button data-bit="4" class="small" aria-label="Jump">JUMP</button>
-          <button data-bit="16" class="attack" aria-label="Attack, hold to charge">ATK</button>
-        </div>
+        <button class="tb skill s1" data-skill="0" aria-label="Skill 1"><span class="lbl">1</span><span class="cdt"></span></button>
+        <button class="tb skill s2" data-skill="1" aria-label="Skill 2"><span class="lbl">2</span><span class="cdt"></span></button>
+        <button class="tb skill s3" data-skill="2" aria-label="Skill 3"><span class="lbl">3</span><span class="cdt"></span></button>
+        <button class="tb attack" data-act="attack" aria-label="Attack: hold to charge, drag to aim">ATK</button>
+        <button class="tb dash" data-act="dash" aria-label="Dash">DASH</button>
       </div>
       <div id="touch-edit" hidden>
-        <p>Drag the two button groups where you want them.</p>
+        <p>Drag the buttons where you want them.</p>
         <button class="btn primary" id="touch-done">DONE</button>
       </div>
     </div>

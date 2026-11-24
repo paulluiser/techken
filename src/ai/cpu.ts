@@ -1,166 +1,120 @@
-// CPU opponents (GDD 6.1). The CPU only reads the visible game state, never your inputs.
-// Difficulty = reaction time + decision quality. Its randomness is its own seeded RNG, so
-// CPU-vs-CPU balance runs are reproducible.
+// CPU opponents for the top-down fighter (GAME_DESIGN.md 6.1). The CPU only produces inputs,
+// exactly like a player, so it can't cheat and the sim stays deterministic.
+// Its own randomness lives in CpuMem (outside the sim state).
 import * as C from "../sim/constants";
-import { chargeFull, jobOf, setOf } from "../sim/core";
-import { IN_ATTACK, IN_DASH, IN_DOWN, IN_GUARD, IN_LEFT, IN_RIGHT, IN_SKILLS, IN_UP } from "../sim/input";
+import { IMPL } from "../sim/core";
+import { KITS } from "../sim/data/kits.gen";
+import { angleOf, dist, wrapA } from "../sim/fixed";
+import { IN_ATTACK, IN_DASH, IN_SKILLS, packInput } from "../sim/input";
 import { PHASE_FIGHT, type State } from "../sim/sim";
 import { K, S } from "../sim/types";
 
-export interface Level {
-  name: string;
-  react: number; // frames between decisions
-  guard: number; // chance to guard a visible threat
-  full: number; // chance to go for a full charge
-  skill: number; // chance to use a ready skill when it fits
-  dodge: number; // chance to dash away from a full charge
-  smart: boolean; // manages Motivation, picks skills by range, goes for items
-  punish: boolean; // rushes in on Burnout and whiffed full charges
-  crunch: boolean; // Crunch Casts for the KO
-}
+export interface Level { name: string; react: number; dodge: number; fullCharge: number; skill: number; reserve: number }
 export const LEVELS: Level[] = [
-  { name: "Intern", react: 36, guard: 0.05, full: 0.1, skill: 0.15, dodge: 0, smart: false, punish: false, crunch: false },
-  { name: "Junior", react: 24, guard: 0.2, full: 0.35, skill: 0.35, dodge: 0, smart: false, punish: false, crunch: false },
-  { name: "Mid-level", react: 17, guard: 0.45, full: 0.6, skill: 0.5, dodge: 0.2, smart: true, punish: false, crunch: false },
-  { name: "Senior", react: 12, guard: 0.65, full: 0.75, skill: 0.6, dodge: 0.5, smart: true, punish: true, crunch: false },
-  { name: "Principal", react: 9, guard: 0.8, full: 0.85, skill: 0.7, dodge: 0.7, smart: true, punish: true, crunch: true },
+  { name: "Intern", react: 34, dodge: 0.05, fullCharge: 0.15, skill: 0.25, reserve: 0 },
+  { name: "Junior", react: 24, dodge: 0.2, fullCharge: 0.4, skill: 0.45, reserve: 0 },
+  { name: "Mid-level", react: 16, dodge: 0.45, fullCharge: 0.7, skill: 0.65, reserve: 2000 },
+  { name: "Senior", react: 11, dodge: 0.7, fullCharge: 0.85, skill: 0.8, reserve: 2500 },
+  { name: "Principal", react: 8, dodge: 0.85, fullCharge: 0.95, skill: 0.92, reserve: 3000 },
 ];
 
-type Tag = "close" | "mid" | "far" | "any" | "heal" | "threat";
-interface Play { range: number; sets: [Tag[], Tag[]] }
-// preferred fighting distance (px) and when each skill makes sense
-const PLAY: Record<string, Play> = {
-  se: { range: 30, sets: [["close", "close", "mid"], ["mid", "threat", "heal"]] },
-  md: { range: 30, sets: [["close", "close", "close"], ["mid", "heal", "any"]] },
-  qa: { range: 32, sets: [["mid", "mid", "any"], ["mid", "any", "any"]] },
-  sa: { range: 40, sets: [["mid", "close", "any"], ["close", "any", "mid"]] },
-  na: { range: 130, sets: [["far", "mid", "any"], ["mid", "mid", "close"]] },
-  db: { range: 26, sets: [["mid", "close", "heal"], ["close", "close", "any"]] },
-  do: { range: 30, sets: [["close", "mid", "any"], ["any", "heal", "threat"]] },
-  ce: { range: 110, sets: [["any", "any", "any"], ["any", "any", "any"]] },
-  ts: { range: 100, sets: [["any", "any", "mid"], ["any", "any", "any"]] },
-  cs: { range: 26, sets: [["threat", "threat", "any"], ["any", "threat", "any"]] },
-  ds: { range: 110, sets: [["far", "any", "any"], ["any", "any", "close"]] },
-  ai: { range: 100, sets: [["any", "any", "any"], ["any", "any", "any"]] },
-  ba: { range: 30, sets: [["mid", "mid", "any"], ["mid", "any", "any"]] },
-  pm: { range: 40, sets: [["mid", "close", "mid"], ["any", "any", "any"]] },
-  ux: { range: 34, sets: [["any", "close", "close"], ["mid", "any", "any"]] },
-  tw: { range: 110, sets: [["mid", "mid", "close"], ["close", "mid", "any"]] },
-  vc: { range: 100, sets: [["far", "close", "any"], ["far", "close", "any"]] },
+/** When each skill is worth using: min/max distance to the opponent (tiles). */
+const SKILL_RANGE: Record<number, [number, number][]> = {
+  0: [[1.4, 3.6], [0, 6], [0, 8]], // Software Engineer
+  5: [[2.2, 5.8], [0, 1.6], [1.8, 5]], // Database Admin
 };
 
-export interface CpuMem { rng: number; until: number; plan: number; tap: number; hold: number; guardFor: number; shotGuardAt: number }
-export const newCpu = (seed: number): CpuMem => ({ rng: (seed >>> 0) || 7, until: 0, plan: 0, tap: 0, hold: 0, guardFor: 0, shotGuardAt: -999 });
-function rand(m: CpuMem): number { m.rng = (Math.imul(m.rng, 1664525) + 1013904223) >>> 0; return (m.rng >>> 8) / 16777216; }
+export interface CpuMem {
+  rng: number; wait: number; move: number; want: number; // want: charge frames to reach before releasing
+  threats: number[]; stuck: number; lastX: number; lastY: number; detour: number; detourA: number; strafe: number;
+  /** Frames spent at a standoff; when patience runs out the CPU commits. */
+  standoff: number; commit: number; lastHp: number;
+}
+export const newCpu = (seed: number): CpuMem => ({ rng: (seed >>> 0) || 1, wait: 0, move: -1, want: 0, threats: [], stuck: 0, lastX: 0, lastY: 0, detour: 0, detourA: 0, strafe: 1, standoff: 0, commit: 0, lastHp: 0 });
+function r01(m: CpuMem) { m.rng = (Math.imul(m.rng, 1664525) + 1013904223) >>> 0; return m.rng / 4294967296; }
+const dir16 = (a: number) => (Math.round(wrapA(a) / 4) & 15);
 
-/** One frame of CPU input for player `me`. */
-export function cpuInput(s: State, me: 0 | 1, level: number, m: CpuMem): number {
+/** One frame of CPU input for fighter i at difficulty 1-5. */
+export function cpuInput(s: State, i: number, level: number, m: CpuMem): number {
   if (s.phase !== PHASE_FIGHT) return 0;
   const L = LEVELS[Math.max(1, Math.min(5, level)) - 1];
-  if (s.frame >= m.until) decide(s, me, L, m);
-  let b = m.plan | m.tap;
-  m.tap = 0;
-  if (m.hold > 0) { b |= IN_ATTACK; m.hold--; } else b &= ~IN_ATTACK;
-  if (m.guardFor > 0) { b = IN_GUARD; m.guardFor--; }
-  return b;
-}
+  const me = s.f[i], op = s.f[1 - i], kit = KITS[me.job], impl = IMPL[me.job];
+  if (!impl || me.hp <= 0) return 0;
+  const d = dist(me.x, me.y, op.x, op.y), toOp = angleOf(op.x - me.x, op.y - me.y, me.face);
+  const T = C.TILE;
+  let buttons = 0, move = -1;
 
-function decide(s: State, me: 0 | 1, L: Level, m: CpuMem) {
-  const f = s.f[me], o = s.f[1 - me], job = jobOf(f), set = setOf(f);
-  const pb = PLAY[job.id] ?? { range: 40, sets: [["any", "any", "any"], ["any", "any", "any"]] };
-  m.until = s.frame + L.react + Math.floor(rand(m) * (L.react >> 1));
-  const P = (n: number) => Math.trunc(n / C.SUB);
-  const dx = P(o.x - f.x), adx = Math.abs(dx), dy = P(o.y - f.y);
-  const toward = dx >= 0 ? IN_RIGHT : IN_LEFT, away = dx >= 0 ? IN_LEFT : IN_RIGHT;
-  let plan = 0;
-
-  if (f.st[S.STUN] > 0 || f.hitstun > 0) { m.plan = 0; m.hold = 0; return; }
-  if (f.charging && m.hold > 0) { m.plan = adx > pb.range ? toward : 0; return; } // keep charging
-
-  // 1. threats: guard or dash away from a big hit
-  const ocf = chargeFull(s, 1 - me);
-  const threat = (o.charging && o.charge >= (ocf * 7) / 10) || (o.atk > 0 && o.atk <= C.ATK_STARTUP + 2);
-  const bigHit = (o.charging && o.charge >= (ocf * 8) / 10) || (o.atk > 0 && o.atkCharge >= ocf); // would break guard
-  if (threat && adx < 60 && Math.abs(dy) < 40) {
-    if (bigHit) {
-      if (rand(m) < L.dodge) {
-        if (f.dashCd === 0 && f.mot > 2500) { m.plan = 0; m.tap = IN_DASH | away; return; }
-        if (f.onGround) { m.plan = away; m.tap = IN_UP; return; }
-      }
-      // smart CPUs interrupt a slow charge with a quick tap instead of eating it
-      if (L.smart && o.charging && adx <= job.reach + 6 && f.atk === 0 && f.recovery === 0) { m.hold = 1; m.plan = 0; return; }
-    } else if (rand(m) < L.guard) { m.guardFor = 12 + Math.floor(rand(m) * 8); m.plan = 0; return; }
-  }
-  // 2a. incoming shots: guard them (or hop) instead of eating them
+  // 1. threats: incoming shots, delayed areas under us, a leap landing on us
+  let threatA = -1, threatId = 0;
   for (const e of s.ents) {
-    if (e.o === me || e.k !== K.PROJ) continue;
-    const ex = P(e.x - f.x), ey = P(f.y - e.y);
-    if (Math.abs(ex) < 70 && ey > 4 && ey < 40 && Math.sign(e.vx) === -Math.sign(ex)) {
-      // smart CPUs dash through shots toward a ranged opponent (dashes are invincible)
-      if (L.smart && f.dashCd === 0 && f.mot > 3000 && adx > 60 && rand(m) < 0.5) { m.plan = toward; m.tap = IN_DASH | toward; return; }
-      if (s.frame - m.shotGuardAt > 40 && rand(m) < L.guard) { m.shotGuardAt = s.frame; m.guardFor = 10; m.plan = 0; return; }
-      if (L.smart && f.onGround && rand(m) < 0.5) { m.tap |= IN_UP; break; }
+    if (e.o === i) continue;
+    if (e.k === K.PROJ) {
+      const rx = me.x - e.x, ry = me.y - e.y, closing = rx * e.vx + ry * e.vy;
+      if (closing <= 0 || dist(0, 0, rx, ry) > 4 * T) continue;
+      const cross = Math.abs(rx * e.vy - ry * e.vx) / (dist(0, 0, e.vx, e.vy) || 1);
+      if (cross < e.r + C.FIGHTER_R + 250) { threatA = angleOf(e.vx, e.vy) + (r01(m) < 0.5 ? 16 : -16); threatId = e.id; }
+    } else if (e.k === K.DELAYED && dist(me.x, me.y, e.x, e.y) < e.r + C.FIGHTER_R) {
+      threatA = angleOf(me.x - e.x, me.y - e.y, toOp + 32); threatId = e.id;
     }
   }
-  // 2b. jump over ground waves / stampedes coming at us
-  if (L.punish && f.onGround) {
-    for (const e of s.ents) {
-      if (e.o === me || (e.k !== K.PROJ && e.b !== "ts.mob")) continue;
-      const ex = P(e.x - f.x), low = P(f.y - e.y) < 18;
-      if (low && Math.abs(ex) < 50 && Math.sign(e.vx) === -Math.sign(ex)) { m.tap |= IN_UP; break; }
+  if (op.air > 0 && dist(me.x, me.y, op.ax1, op.ay1) < 2200) { threatA = angleOf(me.x - op.ax1, me.y - op.ay1, toOp + 32); threatId = -op.air0 - s.round * 1000; }
+  if (threatId && !m.threats.includes(threatId)) {
+    m.threats.push(threatId); if (m.threats.length > 8) m.threats.shift();
+    if (r01(m) < L.dodge && me.dashCd === 0 && me.mot > C.DASH_COST + 500) return packInput(IN_DASH, dir16(threatA));
+  }
+  if (threatA >= 0 && L.dodge > 0.3) move = threatA;
+
+  // 2. skills, checked at reaction speed
+  if (--m.wait <= 0) {
+    m.wait = L.react + Math.floor(r01(m) * L.react);
+    const ranges = SKILL_RANGE[me.job] ?? [[0, 3], [0, 6], [0, 6]];
+    const punish = op.st[S.STUN] > 0 || op.burnout > 0;
+    for (let k = 2; k >= 0; k--) {
+      const [lo, hi] = ranges[k];
+      if (me.cd[k] > 0 || d < lo * T || d > hi * T || me.charging) continue;
+      if (me.mot < kit.skills[k].cost + (punish ? 0 : L.reserve)) continue;
+      if (r01(m) < L.skill) return packInput(IN_SKILLS[k], dir16(toOp));
     }
+    m.want = r01(m) < L.fullCharge || op.burnout > 0 || op.st[S.STUN] > 0 ? kit.charge : Math.floor(kit.charge * 0.2);
+    m.strafe = r01(m) < 0.5 ? 1 : -1;
   }
 
-  // 3. where to stand
-  let want = pb.range;
-  const punishing = L.punish && (o.burnout > 0 || (o.recovery > 8 && adx < 70));
-  if (punishing) want = Math.min(want, job.reach + 4);
-  let itemX = -1;
-  if (L.smart && s.items.length && adx > 50) {
-    for (const it of s.items) { const ix = P(it.x - f.x); if (Math.abs(ix) < 120 && Math.abs(P(it.y - f.y)) < 30) itemX = ix; }
-  }
-  if (itemX !== -1) plan |= itemX > 0 ? IN_RIGHT : IN_LEFT;
-  else if (adx > want + 10) plan |= toward;
-  else if (job.ranged && adx < want - 40 && rand(m) < 0.6) plan |= away;
-  // follow vertically
-  if (f.onGround && dy < -30 && rand(m) < 0.35) m.tap |= IN_UP;
-  else if (f.onGround && dy > 24 && f.y < (184 << 8) && rand(m) < 0.4) m.tap |= IN_DOWN;
-  else if (!L.smart && rand(m) < 0.05) m.tap |= IN_UP;
+  // 3. basic attack: charge while closing in, release in range
+  const reach = impl.range + C.FIGHTER_R / 2 - 150;
+  const opImpl = IMPL[op.job], opKit = KITS[op.job];
+  const opReach = (opImpl?.range ?? 1500) + C.FIGHTER_R / 2;
+  const opOpen = op.recovery > 0 || op.burnout > 0 || op.st[S.STUN] > 0 || op.cast > 0; // a free hit
+  // patience: a long standoff (nobody getting hit) makes the CPU commit for a while
+  const hpSum = me.hp + op.hp;
+  if (hpSum !== m.lastHp) { m.lastHp = hpSum; m.standoff = 0; } else if (++m.standoff > 40 + L.react * 2) { m.standoff = 0; m.commit = 100; }
+  if (m.commit > 0) m.commit--;
+  const danger = op.charging === 1 && d < opReach + 700 && !opOpen && (m.commit === 0 || op.charge * 2 >= KITS[op.job].charge);
+  const ready = me.charging && me.charge >= m.want && d <= reach;
+  const openFor = Math.max(op.recovery, op.st[S.STUN], op.burnout, op.cast, op.hitstun);
+  const toFull = kit.charge - me.charge;
+  if (opOpen && me.charging && d <= reach && me.charge * 2 >= kit.charge && (openFor < toFull + 2 || L.fullCharge < 0.5)) buttons = 0; // punish now
+  else if (opOpen && me.charging) buttons = IN_ATTACK; // the opening lasts long enough: finish the charge
+  else if (me.charging) buttons = ready ? 0 : IN_ATTACK;
+  else if (me.recovery === 0 && me.burnout === 0 && d < reach + 3 * T) buttons |= IN_ATTACK;
 
-  // 4. skills
-  const lethal = L.crunch && o.hp < 90;
-  if (rand(m) < L.skill && f.burnout === 0 && f.st[S.SILENCE] === 0) {
-    const tags = pb.sets[f.set] ?? [];
-    for (let k = 0; k < set.skills.length; k++) {
-      const sk = set.skills[k];
-      if (f.cd[k] > 0) continue;
-      if (L.smart && f.mot < sk.cost + 1500 && !lethal) continue;
-      const tag = L.smart ? tags[k] ?? "any" : "any";
-      const fits = tag === "any" || (tag === "close" && adx <= 50) || (tag === "mid" && adx <= 150) || (tag === "far" && adx <= 260) ||
-        (tag === "heal" && f.hp < 700) || (tag === "threat" && threat && adx < 70);
-      if (fits && rand(m) < 0.7) { m.tap |= IN_SKILLS[k]; break; }
-    }
+  // a big charge is about to land: smart CPUs dash out of it
+  if (danger && op.charge >= opKit.charge - 8 && d < opReach + 200 && L.dodge > 0.3 && me.dashCd === 0 && me.mot > C.DASH_COST + 500 && !ready) {
+    const id = -(s.frame - op.charge) - 7; // one roll per opponent charge
+    if (!m.threats.includes(id)) { m.threats.push(id); if (r01(m) < L.dodge) return packInput(IN_DASH, dir16(toOp + 32 + 8 * m.strafe)); }
   }
 
-  // 4b. clear enemy summons in reach (basics hit them)
-  if (!m.tap && f.atk === 0 && f.recovery === 0 && !job.ranged) {
-    for (const e of s.ents) {
-      if (e.o === me || e.o > 1 || (e.k !== K.SUMMON && e.k !== K.ANCHOR && e.k !== K.WALL)) continue;
-      const ex = P(e.x - f.x);
-      if (Math.abs(ex) <= job.reach + 6 && Math.sign(ex) === f.facing && Math.abs(P(e.y - f.y)) < 30) { m.hold = 1 + Math.floor(rand(m) * 6); m.plan = plan; return; }
-    }
+  // 4. movement: close the distance, keep out of a charging opponent's reach, strafe, detour around cover
+  if (move < 0) {
+    if (me.burnout > 0) move = toOp + 32; // back off while burnt out
+    else if (danger && !ready && L.dodge > 0.15) move = toOp + 32 + 6 * m.strafe; // step back, wait for the whiff
+    else if (opOpen || d > reach - 200) move = toOp;
+    else if (m.commit === 0 && L.dodge > 0.3 && reach > opReach + 100 && d < opReach + 150) move = toOp + 32; // keep them at the edge of our longer reach
+    else if (L.dodge > 0.3) move = toOp + 16 * m.strafe;
   }
-  // 5. basic attack: start a charge when in range
-  const reach = job.ranged ? Math.max(pb.range + 40, 90) : job.reach + 8;
-  if (!m.tap && adx <= reach && Math.abs(dy) < 30 && f.burnout === 0 && f.atk === 0 && f.recovery === 0) {
-    const cf = chargeFull(s, me);
-    // full charges only when they pay off: guard break, punish, or from a safe distance
-    const open = o.guarding || o.st[S.STUN] > 0 || o.recovery > 10 || o.burnout > 0 || o.hitstun > 6 || (job.ranged && adx > 60);
-    const full = L.smart ? (open && rand(m) < L.full) || punishing : rand(m) < L.full;
-    m.hold = full ? cf + 1 : 1 + Math.floor(rand(m) * Math.max(2, cf >> 3));
-    if (L.smart && o.hitstun > 0) m.until = s.frame + 4; // keep the pressure on
-    plan &= ~(IN_LEFT | IN_RIGHT);
-    if (adx > job.reach && !job.ranged) plan |= toward;
-  }
-  m.plan = plan;
+  if (m.detour > 0) { m.detour--; move = m.detourA; }
+  else if (move >= 0 && dist(me.x, me.y, m.lastX, m.lastY) < 15) {
+    if (++m.stuck > 12) { m.stuck = 0; m.detour = 24; m.detourA = toOp + (r01(m) < 0.5 ? 16 : -16); }
+  } else m.stuck = 0;
+  m.lastX = me.x; m.lastY = me.y;
+  return packInput(buttons, move >= 0 ? dir16(move) : -1);
 }

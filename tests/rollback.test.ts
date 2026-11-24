@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest";
 import { RollbackSession } from "../src/net/rollback";
 import type { GameMsg } from "../src/net/protocol";
 import { checksum, DEFAULT_CONFIG, initState, step } from "../src/sim/sim";
+import { ARENAS } from "../src/sim/arenas";
+import { implementedJobs } from "../src/sim/jobs";
 
-// a busy matchup: summons, projectiles, zones, tokens
-const CFG = { ...DEFAULT_CONFIG, jobs: [8, 16] as [number, number], sets: [0, 0] as [number, number], arena: 4, items: true, seed: 42 };
+// Software Engineer vs Database Admin: bouncing shots, hooks, leaps, delayed areas
+const CFG = { ...DEFAULT_CONFIG, jobs: [0, 5] as [number, number], arena: 0, seed: 42 };
 
 function rng(seed: number) {
   let s = seed >>> 0;
@@ -34,7 +36,7 @@ function play(net: Net, ticks: number, delays: [number, number], seed = 1, cfg =
   const log: Map<number, number>[] = [new Map(), new Map()];
   const cur = [0, 0], left = [0, 0];
   const nextInput = (i: number) => {
-    if (--left[i] <= 0) { cur[i] = Math.floor(r() * 1024); left[i] = 3 + Math.floor(r() * 25); }
+    if (--left[i] <= 0) { cur[i] = Math.floor(r() * (1 << 21)); left[i] = 3 + Math.floor(r() * 25); }
     return cur[i];
   };
   for (let t = 0; t < ticks; t++) {
@@ -98,7 +100,8 @@ describe("rollback session", () => {
 
   it("stays in sync for every job across random matchups on a lossy network", () => {
     for (let n = 0; n < 17; n++) {
-      const cfg = { ...DEFAULT_CONFIG, jobs: [n, (n * 7 + 3) % 17] as [number, number], sets: [n % 2, (n >> 1) % 2] as [number, number], arena: n % 13, items: true, seed: 900 + n };
+      const jobs = implementedJobs();
+      const cfg = { ...DEFAULT_CONFIG, jobs: [jobs[n % jobs.length], jobs[(n * 7 + 3) % jobs.length]] as [number, number], arena: n % ARENAS.length, seed: 900 + n };
       const { sess, log } = play({ minDelay: 2, maxDelay: 8, loss: 0.12 }, 1500, [2, 2], 500 + n, cfg);
       for (const x of sess) expect(x.stats.desync).toBe(false);
       expectMatchesReference(sess, log, cfg);

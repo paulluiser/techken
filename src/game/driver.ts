@@ -1,7 +1,8 @@
 // Runs the simulation at a fixed 60 Hz, either locally (attract/practice) or through the
 // rollback session (online). Rendering reads `state` and never changes it.
 import { cpuInput, newCpu, type CpuMem } from "../ai/cpu";
-import { JOBS } from "../sim/registry";
+import { ARENAS } from "../sim/arenas";
+import { implementedJobs } from "../sim/jobs";
 import { DEFAULT_CONFIG, initState, step, type MatchConfig, type State } from "../sim/sim";
 import { RollbackSession } from "../net/rollback";
 import type { PeerLink } from "../net/transport";
@@ -11,7 +12,7 @@ const STEP_MS = 1000 / 60;
 export type Mode = "attract" | "practice" | "online";
 export interface InputReader { read(): number }
 
-export const implementedJobs = () => JOBS.map((j, k) => (j ? k : -1)).filter((k) => k >= 0);
+export { implementedJobs };
 
 export function randomConfig(arena?: number): MatchConfig {
   const jobs = implementedJobs();
@@ -19,8 +20,7 @@ export function randomConfig(arena?: number): MatchConfig {
   return {
     ...DEFAULT_CONFIG,
     jobs: [jobs[r(jobs.length)], jobs[r(jobs.length)]],
-    sets: [r(2), r(2)],
-    arena: arena ?? r(13),
+    arena: arena ?? r(ARENAS.length),
     seed: (Math.random() * 2 ** 31) | 0,
     loop: true,
   };

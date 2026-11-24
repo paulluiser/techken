@@ -1,25 +1,24 @@
 # Techken
 
-**Build status:** see `ROADMAP.md`. Phase 1 is done: the combat engine (guard, skills, status caps, summons, projectiles, zones, all 14 items, all 13 arena layouts) Phase 2 added the other 11 jobs, so **all 17 jobs × 2 sets (34 kits)** are playable vs CPU and online with a blind job/set pick.
+A 1v1 **top-down arena fighter** where every fighter is a tech job. Browser game, no login.
 
-## Online test (phase 0)
-
-The first build of Techken: two boxes fighting online. It exists to prove that browser
-rollback netcode feels good between a laptop and a phone before any art or fighters are made
-(see `GAME_DESIGN.md`, sections 6.2 and 11).
+**Build status:** see `ROADMAP.md`. The game is being rebuilt as a top-down fighter (v0.3).
+**R1 is done:** the top-down core with the **Software Engineer** and the **Database Admin**,
+playable vs CPU (5 levels) and online. The other 15 jobs arrive in R2.
 
 **What's in it**
-- **Deterministic sim** (`src/sim/`): integer-only, 60 ticks/s. Walk, jump/double jump,
-  drop-through platforms, hold-to-charge attack (tap 25 / full 70), dash with i-frames,
-  Motivation and Burnout, best-of-3 rounds of 90 s on The Terminal.
+- **Deterministic sim** (`src/sim/`): integer-only, 60 ticks/s, 64-direction fixed-point math.
+  Move in any direction, dash with invulnerability, hold-to-charge basic attacks, 3 skills per
+  job, Motivation and Burnout, best-of-3 rounds of 90 s with Overtime.
+- **Kit data** (`src/sim/data/kits.gen.ts`): generated from `design/kits_v3.py`, which also
+  scores balance and prints the tables in `GAME_DESIGN.md`.
 - **Rollback netcode** (`src/net/rollback.ts`): input delay (default 2 frames), prediction,
   up to 8 frames of rollback, time sync, and checksums every second to catch desyncs.
-- **WebRTC transport** (`src/net/transport.ts`): browser to browser, with an unreliable
-  channel for inputs and a reliable one for control messages. Includes a lag simulator.
-- **Lobby codes** (`api/`, `server/`): Vercel Functions plus Upstash Redis, which carry only
-  the WebRTC handshake. `api/turn` hands out Cloudflare TURN credentials.
-- **Phaser 4 renderer** (`src/render/`): it only draws, and never changes game state.
-- **Touch controls** on phones, plus keyboard on desktop.
+- **WebRTC transport** (`src/net/transport.ts`) and **lobby codes** (`api/`, `server/`, Vercel
+  Functions plus Upstash Redis). `api/turn` hands out Cloudflare TURN credentials.
+- **three.js renderer** (`src/render3d/`): stand-in chibi models, arena dioramas and the HUD.
+  It only draws and never changes game state.
+- **CPU opponents** (`src/ai/cpu.ts`): they dodge shots, use cover and skills, and punish openings.
 
 ## Run it locally
 
@@ -41,17 +40,16 @@ npm run dev
 
 **Controls**
 
-| Action | Keys |
-|---|---|
-| Move | A/D or ←/→ |
-| Jump | W, ↑ or Space |
-| Drop through a platform | S or ↓ |
-| Attack | **J** (hold to charge) |
-| Guard | **K** |
-| Dash | L or Shift |
-| Skills | **U / I / O** |
+| Action | Keyboard and mouse | Gamepad | Touch |
+|---|---|---|---|
+| Move | W A S D or arrows | Left stick | Floating joystick (left side) |
+| Aim | Mouse (or auto-aim) | Right stick (or auto-aim) | Drag Attack or a skill button |
+| Attack (hold to charge) | Left click or J | Right trigger | ATK |
+| Dash | Space, Shift, K or right click | Left trigger or A | DASH |
+| Skills 1 / 2 / 3 | Q / E / R (or U / I / O) | X / Y / B | Skill buttons (drag to aim, drag back to cancel) |
 
-On phones the on-screen buttons appear automatically. Add `?touch=1` to force them on desktop.
+Without manual aim, attacks and skills aim at the opponent. On phones the touch controls appear
+automatically. Add `?touch=1` to force them on desktop.
 
 ## Tests
 
@@ -61,8 +59,9 @@ npm test
 
 | Test file | What it checks |
 |---|---|
-| `tests/sim.test.ts` | Determinism, clone and resume, integer-only state, damage, Burnout and KO rules |
+| `tests/sim.test.ts` | Determinism, cloning, movement and walls, dash, charged basics, both R1 kits, Burnout, round flow and Overtime |
 | `tests/rollback.test.ts` | Two sessions over a simulated network (up to ~200 ms jitter, 20 % loss, 30 seeds). They must never desync, and must end on the exact state of a plain simulation with the same inputs |
+| `tests/cpu.test.ts` | CPU matches finish, Principal beats Intern, rounds last a sensible time |
 | `tests/lobby.test.ts` | The handshake, the "meeting is full" rule, code validation and rate limiting |
 
 ```bash

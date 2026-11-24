@@ -1,0 +1,398 @@
+<title>Techken Game Types</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Inter:wght@400;600;700&display=swap">
+<style>
+  /* Layout: seven stacked 16:9 frames, one per fighting-game type, each with a fact strip (match, reuse, art fit, scope). Single deep-indigo theme, matching the chosen mobile 3D direction. */
+  :root {
+    --bg: #14122b; --panel: #1d1a3d; --line: #35306a; --fg: #f1eefc; --dim: #aaa5d0;
+    --gold: #ffc63a; --cyan: #3fb8ff; --violet: #a86bff; --green: #5fe08a; --red: #ff7a6b; --ink: #1a1636;
+    --display: 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif; --body: 'Inter', system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { background: var(--bg); color: var(--fg); }
+  body { font: 15px/1.55 var(--body); margin: 0; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding-block: 30px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 34px; }
+  header { display: grid; gap: 10px; }
+  h1 { font: 40px/1.05 var(--display); margin: 0; color: var(--gold); text-shadow: 0 3px 0 var(--ink); text-wrap: balance; }
+  header p { margin: 0; max-width: 72ch; color: var(--dim); }
+  header p b { color: var(--fg); }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  nav a { font: 16px/1 var(--display); color: var(--fg); text-decoration: none; background: var(--panel); border: 1px solid var(--line); border-radius: 99px; padding: 8px 12px; }
+  nav a:focus-visible, nav a:hover { border-color: var(--gold); outline: none; }
+  section { display: grid; gap: 12px; scroll-margin-top: 16px; }
+  .lbl { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .num { font: 20px/1 var(--display); color: var(--ink); background: var(--gold); width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; }
+  h2 { font: 28px/1.1 var(--display); margin: 0; letter-spacing: 0.3px; }
+  .pick { font: 700 12px/1 var(--body); letter-spacing: 1px; text-transform: uppercase; color: var(--ink); background: var(--green); padding: 6px 10px; border-radius: 99px; }
+  .frame { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #000; aspect-ratio: 16 / 9; max-width: 100%; }
+  .frame canvas { display: block; width: 100%; height: 100%; }
+  section > p { margin: 0; color: var(--dim); max-width: 80ch; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+  .facts div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+  .facts b { display: block; font: 700 11px/1.4 var(--body); letter-spacing: 1px; text-transform: uppercase; color: var(--dim); }
+  .facts span { font-size: 14px; }
+  .good { color: var(--green); } .ok { color: var(--gold); } .bad { color: var(--red); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Techken: seven ways to fight</h1>
+    <p>Every frame keeps the core: <b>tech jobs fighting with their skills, Motivation and Burnout</b>. Only the game type changes. All seven use the same mobile 3D look, so you're comparing how the fight plays, not how it's drawn. Characters are code-built stand-ins.</p>
+    <nav aria-label="Game types">
+      <a href="#t1">1 Side-view</a><a href="#t2">2 Platform</a><a href="#t3">3 Top-down</a><a href="#t4">4 Tag team</a><a href="#t5">5 Roguelite</a><a href="#t6">6 Objective</a><a href="#t7">7 Card</a>
+    </nav>
+  </header>
+  <div id="list"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+const TYPES = [
+  { id: "t1", name: "Side-view versus fighter", tag: "", desc: "What Techken is today: 1v1 on a side-on stage with platforms, rounds and a 90-second timer. The Software Engineer dashes in mid-air at a grounded Database Admin.",
+    facts: [["Match", "1v1, best of 3, 90 s rounds"], ["Reuse", "<span class='good'>Everything</span>"], ["Art fit", "<span class='ok'>OK. Side-on hides the floors</span>"], ["Scope", "<span class='good'>Done; art swap only</span>"]] },
+  { id: "t2", name: "Platform fighter", tag: "", desc: "Up to four players on a floating stage. Hits raise a damage percentage instead of draining HP, and the higher it is, the farther you fly. Knock someone off the edge to take a life.",
+    facts: [["Match", "2-4 players, 3 lives each"], ["Reuse", "<span class='good'>High: new KO rule and stages</span>"], ["Art fit", "<span class='ok'>OK</span>"], ["Scope", "<span class='ok'>Medium: knockback tuning, 4-player netcode</span>"]] },
+  { id: "t3", name: "Top-down arena fighter", tag: "Recommended", desc: "1v1 in a closed office arena seen from above. Move with the left stick, aim skills with the right. Desks are cover, walls bounce projectiles, and zones and traps read clearly on the floor.",
+    facts: [["Match", "1v1 now, 2v2 / 3v3 later"], ["Reuse", "<span class='ok'>Medium: sim moves to a floor plane</span>"], ["Art fit", "<span class='good'>Best: the camera this look is built for</span>"], ["Scope", "<span class='ok'>Medium: every skill needs a check</span>"]] },
+  { id: "t4", name: "Tag-team fighter", tag: "", desc: "Pick two jobs. One fights while the partner waits off-stage, ready to tag in or call an assist. Pairs like Software Engineer + QA Analyst unlock combo skills.",
+    facts: [["Match", "2v2 tag, one active each"], ["Reuse", "<span class='good'>High, on top of 1 or 3</span>"], ["Art fit", "<span class='ok'>Same as its base</span>"], ["Scope", "<span class='ok'>Medium: pair balance, more picks</span>"]] },
+  { id: "t5", name: "Roguelite fight ladder", tag: "Recommended mode", desc: "A solo run up the office tower: fight a CPU employee on each floor, pick perks between fights, and face a boss at the top. Lose and the run resets, but your unlocks stay.",
+    facts: [["Match", "Solo, 6-floor runs vs CPU"], ["Reuse", "<span class='good'>High: CPU, items, buffs</span>"], ["Art fit", "<span class='good'>Strong: perk cards suit the UI</span>"], ["Scope", "<span class='good'>Small-medium, as a mode</span>"]] },
+  { id: "t6", name: "Objective arena brawler", tag: "", desc: "Two teams of three fight over the server rack in the middle. Stand in the ring to capture it; first team to 100% wins. Support jobs like PM and UX finally have a team role.",
+    facts: [["Match", "3v3, capture the server"], ["Reuse", "<span class='ok'>Medium, needs 3 first</span>"], ["Art fit", "<span class='good'>Strong</span>"], ["Scope", "<span class='bad'>Large: 6-player netcode, team balance</span>"]] },
+  { id: "t7", name: "Card and turn-based fighter", tag: "", desc: "Skills become cards and Motivation is the energy to play them. Burnout clogs your hand with useless cards. Each turn plays out as a short animated exchange.",
+    facts: [["Match", "1v1, turn-based"], ["Reuse", "<span class='bad'>Low: only kit data and art</span>"], ["Art fit", "<span class='good'>Strong</span>"], ["Scope", "<span class='bad'>Large: new game logic</span>"]] },
+];
+const list = document.getElementById("list");
+list.style.display = "grid"; list.style.gap = "40px";
+TYPES.forEach((t, i) => {
+  const s = document.createElement("section"); s.id = t.id;
+  s.innerHTML = `<div class="lbl"><span class="num">${i + 1}</span><h2>${t.name}</h2>${t.tag ? `<span class="pick">${t.tag}</span>` : ""}</div>
+    <div class="frame"><canvas width="1280" height="720" role="img" aria-label="${t.name} sample"></canvas></div>
+    <p>${t.desc}</p><div class="facts">${t.facts.map(([k, v]) => `<div><b>${k}</b><span>${v}</span></div>`).join("")}</div>`;
+  list.append(s);
+});
+if (typeof THREE === "undefined") return;
+
+const W = 1280, H = 720;
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const lin = (hex) => new THREE.Color(hex).convertSRGBToLinear();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.98;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+/* ---------- kit ---------- */
+const glowTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d"); const g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.25, "rgba(255,255,255,0.55)"); g.addColorStop(1, "rgba(255,255,255,0)"); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+const sprite = (color, size, op = 1) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: lin(color), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: op })); s.scale.set(size, size, 1); return s; };
+const mats = new Map();
+const M = (hex, o = {}) => { const k = hex + JSON.stringify(o); if (!mats.has(k)) mats.set(k, o.basic ? new THREE.MeshBasicMaterial({ color: lin(hex), transparent: !!o.op, opacity: o.op ?? 1, blending: o.add ? THREE.AdditiveBlending : THREE.NormalBlending, depthWrite: !o.add, side: o.side || THREE.FrontSide }) : new THREE.MeshStandardMaterial({ color: lin(hex), roughness: o.r ?? 0.55, metalness: o.m ?? 0, emissive: o.e ? lin(o.e) : 0x000000, emissiveIntensity: o.ei ?? 1 })); return mats.get(k); };
+const mesh = (geo, hex, o) => { const m = new THREE.Mesh(geo, M(hex, o)); m.castShadow = !(o && o.basic); m.receiveShadow = true; return m; };
+const sph = (r, hex, s = [1, 1, 1], o) => { const m = mesh(new THREE.SphereGeometry(r, 32, 22), hex, o); m.scale.set(...s); return m; };
+const cyl = (rt, rb, h, hex, o, seg = 32) => mesh(new THREE.CylinderGeometry(rt, rb, h, seg), hex, o);
+const box = (w, h, d, hex, o) => mesh(new THREE.BoxGeometry(w, h, d), hex, o);
+const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
+const add = (sc, ...ms) => { ms.forEach((m) => sc.add(m)); return ms[0]; };
+
+const JOBS = {
+  se: { name: "Software Engineer", hair: "#3b3570", top: "#38c98a", pants: "#2f3566", skin: "#ffd6bd", shoe: "#ffffff", style: "spiky" },
+  db: { name: "Database Admin", hair: "#7a4526", top: "#ff9a3d", pants: "#3a3566", skin: "#f5c29c", shoe: "#3a3566", style: "bun" },
+  qa: { name: "QA Analyst", hair: "#ffd86b", top: "#9b6bff", pants: "#30305a", skin: "#ffdcc6", shoe: "#ffffff", style: "bob" },
+  pm: { name: "Project Manager", hair: "#2b2b3a", top: "#ff5d7a", pants: "#2f3566", skin: "#e8b48f", shoe: "#2b2b3a", style: "short" },
+  cs: { name: "Cybersecurity", hair: "#1f2a35", top: "#2f4f5f", pants: "#1f2a35", skin: "#ffd6bd", shoe: "#1f2a35", style: "hood" },
+  ux: { name: "UI/UX Designer", hair: "#e05a8a", top: "#ffcf4d", pants: "#3a3566", skin: "#ffe0cc", shoe: "#ffffff", style: "beret" },
+  na: { name: "Network Admin", hair: "#4a3020", top: "#4db6ff", pants: "#2f3566", skin: "#d9a07a", shoe: "#ffffff", style: "headset" },
+  ds: { name: "Data Scientist", hair: "#a33b2b", top: "#5fd0c0", pants: "#30305a", skin: "#ffd6bd", shoe: "#ffffff", style: "bob" },
+};
+function chibi(key, o = {}) {
+  const j = JOBS[key], g = new THREE.Group(), head = new THREE.Group();
+  for (const s of [-1, 1]) { add(g, at(cyl(0.12, 0.13, 0.3, j.pants), s * 0.15, 0.27, 0), at(sph(0.17, j.shoe, [1, 0.62, 1.35], { r: 0.4 }), s * 0.16, 0.1, 0.06)); }
+  add(g, at(cyl(0.3, 0.4, 0.52, j.top), 0, 0.66, 0), at(sph(0.34, j.top, [1, 0.42, 1]), 0, 0.92, 0));
+  head.position.set(0, 1.55, 0); g.add(head);
+  head.add(sph(0.7, j.skin, [1.06, 0.94, 1], { r: 0.6 }));
+  if (j.style !== "hood") {
+    const cap = mesh(new THREE.SphereGeometry(0.74, 32, 22, 0, Math.PI * 2, 0, j.style === "short" ? 1.35 : 1.65), j.hair, { r: 0.35 }); cap.position.set(0, 0.05, -0.04); head.add(cap);
+    if (j.style !== "short") head.add(at(sph(0.7, j.hair, [1, 1, 1], { r: 0.35 }), 0, 0, -0.16));
+  }
+  for (const s of [-1, 1]) {
+    head.add(at(sph(0.15, "#1c1838", [0.78, 1.15, 0.35], { r: 0.2 }), s * 0.26, -0.06, 0.64));
+    head.add(at(sph(0.05, "#ffffff", [1, 1, 1], { basic: true }), s * 0.26 - 0.04, 0.03, 0.7));
+    head.add(at(sph(0.09, "#ff8fa8", [1.4, 0.55, 0.3], { r: 0.8 }), s * 0.42, -0.24, 0.55));
+  }
+  const arm = (s) => { const p = new THREE.Group(); p.position.set(s * 0.42, 0.84, 0); add(p, at(cyl(0.1, 0.1, 0.36, j.top), 0, -0.18, 0), at(sph(0.15, j.skin), 0, -0.4, 0)); g.add(p); return p; };
+  const aR = arm(-1), aL = arm(1);
+  if (j.style === "spiky") for (const [x, y, z, rz, rx] of [[-0.35, 0.62, 0.1, 0.7, 0.2], [0.05, 0.75, 0.05, 0.1, 0.3], [0.38, 0.6, 0.1, -0.6, 0.2], [-0.1, 0.5, 0.45, 0.2, 0.9], [0.25, 0.5, 0.42, -0.3, 0.9]]) { const t = sph(0.22, j.hair, [0.7, 1.5, 0.7], { r: 0.35 }); t.position.set(x, y, z); t.rotation.set(rx, 0, rz); head.add(t); }
+  if (j.style === "bun") { head.add(at(sph(0.26, j.hair), 0, 0.74, -0.2)); head.add(at(sph(0.52, j.hair, [1, 0.6, 0.8], { r: 0.4 }), 0, -0.4, 0.16)); }
+  if (j.style === "bob") for (const s of [-1, 1]) head.add(at(sph(0.32, j.hair, [0.8, 1.3, 0.9], { r: 0.35 }), s * 0.6, -0.25, 0.05));
+  if (j.style === "hood") { const h = mesh(new THREE.SphereGeometry(0.8, 32, 22, 0, Math.PI * 2, 0, 2.2), j.top, { r: 0.7 }); h.position.set(0, 0.04, -0.08); h.rotation.x = -0.35; head.add(h); }
+  if (j.style === "beret") head.add(at(sph(0.6, "#d6336c", [1.1, 0.35, 1.1], { r: 0.7 }), 0.1, 0.62, -0.05));
+  if (j.style === "headset") { const r = mesh(new THREE.TorusGeometry(0.78, 0.05, 10, 32, Math.PI), "#2b2b3a"); r.position.y = 0.05; head.add(r); for (const s of [-1, 1]) head.add(at(sph(0.18, "#2b2b3a", [0.6, 1, 1]), s * 0.76, -0.05, 0)); }
+  if (o.prop && key === "se") { const kb = new THREE.Group(); kb.add(box(0.95, 0.1, 0.34, "#3a3f62")); for (let i = 0; i < 6; i++) kb.add(at(box(0.12, 0.07, 0.12, ["#ffcf4d", "#ff6b9a", "#6fd8ff"][i % 3]), -0.38 + i * 0.15, 0.08, 0)); kb.position.set(0, -0.62, 0.1); kb.rotation.set(0.2, 0, 1.45); aR.add(kb); }
+  if (o.prop && key === "db") { const d = new THREE.Group(); for (let k = 0; k < 3; k++) { d.add(at(cyl(0.42, 0.42, 0.2, "#3f7fe0"), 0, k * 0.24, 0)); d.add(at(sph(0.04, "#6dff9a", [1, 1, 1], { basic: true }), 0.28, k * 0.24, 0.32)); } d.position.set(0, 0.5, 0.72); g.add(d); aR.rotation.set(-1.2, 0, 0.3); aL.rotation.set(-1.2, 0, -0.3); }
+  if (o.prop && key === "qa") { const mg = new THREE.Group(); mg.add(mesh(new THREE.TorusGeometry(0.22, 0.05, 10, 32), "#ffcf4d")); mg.add(at(cyl(0.05, 0.05, 0.4, "#7a4526"), 0, -0.4, 0)); mg.position.set(0, -0.75, 0.25); aR.add(mg); aR.rotation.set(-1.0, 0, 0.5); }
+  if (o.prop && key === "pm") { aR.add(at(box(0.5, 0.65, 0.06, "#fff3d6"), 0, -0.6, 0.2)); aR.rotation.set(-0.9, 0, 0.2); }
+  if (o.ring) { const r = mesh(new THREE.RingGeometry(0.55, 0.72, 40), o.ring, { basic: true, op: 0.9, side: THREE.DoubleSide }); r.rotation.x = -Math.PI / 2; r.position.y = 0.03; g.add(r); }
+  if (o.scale) g.scale.setScalar(o.scale);
+  return { g, head, aR, aL, key };
+}
+function tiles(sc, x0, x1, z0, z1, a, b, y = 0) { for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const h = 0.4 + (((x * 73 + z * 31) % 7) - 3) * 0.006; add(sc, at(box(0.96, h, 0.96, (x + z) & 1 ? a : b, { r: 0.75 }), x, y + h / 2 - 0.4, z)); } }
+function lights(sc, o = {}) {
+  sc.add(new THREE.HemisphereLight(lin(o.sky || "#fff4e6"), lin(o.ground || "#5a52b8"), o.amb ?? 0.75));
+  const k = new THREE.DirectionalLight(lin("#fff1dc"), o.key ?? 1.05); k.position.set(...(o.pos || [4, 12, 9])); k.castShadow = true; k.shadow.mapSize.set(1024, 1024);
+  Object.assign(k.shadow.camera, { left: -14, right: 14, top: 12, bottom: -10, near: 1, far: 50 }); k.shadow.radius = 4; k.shadow.bias = -0.0006; sc.add(k);
+  const r = new THREE.DirectionalLight(lin(o.rim || "#8fe8ff"), 1.2); r.position.set(-3, 5, -9); sc.add(r);
+}
+function desk(sc, x, y, z, w, col = "#ffb259") { const g = new THREE.Group(); add(g, box(w, 0.34, 1.3, col), at(box(w - 0.2, 0.1, 1.1, "#ffd08a"), 0, 0.2, 0)); g.position.set(x, y, z); sc.add(g); return g; }
+function cubicleRow(sc, z, x0, x1, step = 2) { for (let x = x0; x <= x1; x += step) { add(sc, at(box(step - 0.08, 1.3, 0.9, (x / step) & 1 ? "#e6e1ff" : "#d8d2fb", { r: 0.7 }), x, 0.65, z)); add(sc, at(box(step - 0.02, 0.14, 0.98, "#ffb259"), x, 1.36, z)); } }
+const cam = (fov, p, l) => { const c = new THREE.PerspectiveCamera(fov, W / H, 0.1, 120); c.position.set(...p); c.lookAt(...l); return c; };
+
+/* ---------- HUD helpers ---------- */
+function rr(x, X, Y, w, h, r) { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+function txt(x, s, X, Y, size, fill, align = "center", stroke = 7) { x.font = `${size}px 'Lilita One', sans-serif`; x.textAlign = align; x.textBaseline = "middle"; x.lineJoin = "round"; x.lineWidth = stroke; x.strokeStyle = "#1a1636"; x.strokeText(s, X, Y + 3); x.strokeText(s, X, Y); x.fillStyle = fill; x.fillText(s, X, Y); }
+function gold(x, y1, y2) { const g = x.createLinearGradient(0, y1, 0, y2); g.addColorStop(0, "#fff1a6"); g.addColorStop(0.5, "#ffc63a"); g.addColorStop(1, "#f08a1c"); return g; }
+function bar(x, X, Y, w, h, frac, c1, c2, rev) { rr(x, X, Y, w, h, h / 2); x.fillStyle = "#1a1636"; x.fill(); const iw = (w - 8) * frac, g = x.createLinearGradient(0, Y, 0, Y + h); g.addColorStop(0, c1); g.addColorStop(1, c2); rr(x, rev ? X + w - 4 - iw : X + 4, Y + 4, iw, h - 8, (h - 8) / 2); x.fillStyle = g; x.fill(); }
+function portrait(x, X, Y, s, label, col, frame) { rr(x, X, Y, s, s, s * 0.22); x.fillStyle = frame || gold(x, Y, Y + s); x.fill(); x.lineWidth = 5; x.strokeStyle = "#1a1636"; x.stroke(); rr(x, X + 6, Y + 6, s - 12, s - 12, s * 0.16); x.fillStyle = col; x.fill(); txt(x, label, X + s / 2, Y + s / 2 + 2, s * 0.38, "#fff", "center", 6); }
+function hexTimer(x, X, Y, r, label) { x.save(); x.translate(X, Y); x.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); x.fillStyle = gold(x, -r, r); x.fill(); x.lineWidth = 6; x.strokeStyle = "#1a1636"; x.stroke(); x.restore(); txt(x, label, X, Y - 2, r * 0.9, "#fff"); }
+function stick(x, X, Y, r, dx, dy, col) { x.beginPath(); x.arc(X, Y, r, 0, 7); x.fillStyle = "rgba(26,22,54,0.35)"; x.fill(); x.lineWidth = 5; x.strokeStyle = "rgba(255,255,255,0.5)"; x.stroke(); x.beginPath(); x.arc(X + dx, Y + dy, r * 0.44, 0, 7); x.fillStyle = col; x.fill(); x.lineWidth = 5; x.strokeStyle = "#1a1636"; x.stroke(); }
+function roundBtn(x, X, Y, r, c1, c2, label, cd) { x.beginPath(); x.arc(X, Y, r, 0, 7); const g = x.createLinearGradient(0, Y - r, 0, Y + r); g.addColorStop(0, c1); g.addColorStop(1, c2); x.fillStyle = g; x.fill(); x.lineWidth = 6; x.strokeStyle = "#1a1636"; x.stroke(); if (cd) { x.beginPath(); x.moveTo(X, Y); x.arc(X, Y, r - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * cd); x.closePath(); x.fillStyle = "rgba(26,22,54,0.6)"; x.fill(); } txt(x, label, X, Y + 2, r * 0.6, "#fff", "center", 6); }
+const proj = (v, c) => { const p = v.clone().project(c); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H]; };
+const wpos = (o, dy = 0) => { const v = new THREE.Vector3(); o.getWorldPosition(v); v.y += dy; return v; };
+
+/* ---------- 1 side-view ---------- */
+function sideView() {
+  const sc = new THREE.Scene(); sc.background = lin("#2a2a66");
+  tiles(sc, -10, 10, -2, 2, "#4fbfae", "#45b0a0"); cubicleRow(sc, -3.4, -10, 10);
+  add(sc, at(box(30, 12, 0.5, "#3a3a86", { r: 0.9 }), 0, 4, -5.5));
+  desk(sc, -5.4, 2.3, -0.3, 3.2); desk(sc, 5.4, 2.3, -0.3, 3.2); desk(sc, 0, 3.7, -0.8, 3);
+  const se = chibi("se", { prop: true }), db = chibi("db", { prop: true });
+  se.g.position.set(-2.4, 1.3, 0.3); se.g.rotation.y = 1.0; db.g.position.set(1.8, 0, 0.3); db.g.rotation.y = -1.0; sc.add(se.g, db.g);
+  const trail = []; for (let i = 0; i < 6; i++) { const s = sprite("#7dffcf", 1.2 - i * 0.12, 0.5 - i * 0.07); sc.add(s); trail.push(s); }
+  lights(sc);
+  const c = cam(34, [0, 3.0, 15], [0, 2.0, 0]);
+  return { sc, c, update(t) { const ph = (t * 0.6) % 1; se.g.position.set(-3.6 + ph * 3.2, 0.4 + Math.sin(ph * Math.PI) * 1.6, 0.3); se.aR.rotation.set(-0.3, 0, -2.4 + ph * 1.4); trail.forEach((s, i) => s.position.set(se.g.position.x - 0.4 - i * 0.35, se.g.position.y + 1.1, 0.3)); db.g.position.y = Math.abs(Math.sin(t * 3)) * 0.04; },
+    hud(x) { portrait(x, 28, 22, 88, "SE", "#38c98a"); portrait(x, W - 116, 22, 88, "DB", "#ff9a3d"); txt(x, "Software Engineer", 130, 36, 26, "#fff", "left", 6); txt(x, "Database Admin", W - 130, 36, 26, "#fff", "right", 6); bar(x, 128, 54, 380, 30, 0.78, "#8dffa1", "#2fbf55"); bar(x, W - 508, 54, 380, 30, 0.55, "#ff8f7a", "#e5383b", true); bar(x, 128, 90, 240, 14, 0.5, "#fff1a6", "#ffc63a"); bar(x, W - 368, 90, 240, 14, 0.7, "#fff1a6", "#ffc63a", true); hexTimer(x, W / 2, 62, 48, "62"); [1, 0].forEach((on, i) => { x.beginPath(); x.arc(W / 2 - 14 + i * 28, 126, 9, 0, 7); x.fillStyle = on ? "#ffd34d" : "#3b3570"; x.fill(); x.lineWidth = 4; x.strokeStyle = "#1a1636"; x.stroke(); }); txt(x, "ROUND 2", W / 2, 170, 34, gold(x, 150, 190)); } };
+}
+
+/* ---------- 2 platform fighter ---------- */
+function platform() {
+  const sc = new THREE.Scene(); sc.background = lin("#2b2a72"); sc.fog = new THREE.Fog(lin("#2b2a72"), 18, 60);
+  // city below
+  for (let i = 0; i < 40; i++) { const x = (i % 10) * 4.5 - 21 + ((i * 7) % 3), z = -10 - Math.floor(i / 10) * 6, h = 4 + ((i * 37) % 9); add(sc, at(box(3, h, 3, "#3d3b8f", { r: 0.8 }), x, -9 + h / 2, z)); for (let k = 0; k < 4; k++) add(sc, at(box(0.3, 0.3, 0.05, ["#ffd34d", "#7dffcf"][k % 2], { basic: true }), x - 0.8 + (k % 2) * 1.2, -9 + h - 1 - Math.floor(k / 2) * 1.4, z + 1.53)); }
+  // main stage: a floating office floor
+  tiles(sc, -6, 6, -1, 1, "#4fbfae", "#45b0a0");
+  add(sc, at(box(13, 1.2, 3, "#d8d2fb", { r: 0.7 }), 0, -1.0, 0));
+  add(sc, at(cyl(3.5, 1.2, 4, "#5b4fb8", { r: 0.6 }, 6), 0, -3.6, 0));
+  for (let k = 0; k < 6; k++) add(sc, at(box(0.15, 0.15, 0.05, "#6dff9a", { basic: true }), -1.5 + k * 0.6, -2.4, 1.6));
+  desk(sc, -4.2, 2.4, 0, 3); desk(sc, 4.2, 2.4, 0, 3); desk(sc, 0, 4.4, 0, 3.2);
+  const se = chibi("se", { prop: true }), db = chibi("db"), qa = chibi("qa", { prop: true }), pm = chibi("pm");
+  se.g.position.set(-2.4, 0, 0.3); se.g.rotation.y = 0.9; db.g.position.set(-4.2, 2.6, 0); db.g.rotation.y = 0.5; qa.g.position.set(1.4, 0, 0.3); qa.g.rotation.y = -0.6;
+  sc.add(se.g, db.g, qa.g, pm.g);
+  const trail = []; for (let i = 0; i < 8; i++) { const s = sprite("#ff9b4d", 1.4 - i * 0.12, 0.7 - i * 0.07); sc.add(s); trail.push(s); }
+  const star = sprite("#fff1a6", 6, 0); sc.add(star);
+  lights(sc, { sky: "#e8e4ff", ground: "#3a3490" });
+  const c = cam(34, [0, 3.4, 18], [0, 1.6, 0]);
+  return { sc, c, update(t) {
+    const ph = (t * 0.45) % 1; pm.g.position.set(3 + ph * 9, 1 + ph * 5 - ph * ph * 2, 0.3); pm.g.rotation.set(0, 0, -ph * 9);
+    trail.forEach((s, i) => { const q = Math.max(0, ph - i * 0.02); s.position.set(3 + q * 9, 1.8 + q * 5 - q * q * 2, 0.3); });
+    star.position.set(12.5, 4.5, 0); star.material.opacity = ph > 0.85 ? (1 - ph) * 6 : 0; star.scale.setScalar(4 + (ph > 0.85 ? (ph - 0.85) * 40 : 0));
+    se.aR.rotation.set(-0.3, 0, -1.4 + Math.sin(t * 6) * 0.6); qa.g.position.y = Math.abs(Math.sin(t * 3)) * 0.05; db.g.position.y = 2.6 + Math.abs(Math.sin(t * 2.5)) * 0.4;
+  }, hud(x, t) {
+    const ph = (t * 0.45) % 1;
+    const cards = [["SE", "#38c98a", "Software Eng.", 37, 3], ["DB", "#ff9a3d", "Database Admin", 64, 2], ["QA", "#9b6bff", "QA Analyst", 88, 3], ["PM", "#ff5d7a", "Project Manager", 142, ph > 0.88 ? 1 : 2]];
+    cards.forEach(([k, col, n, pct, lives], i) => {
+      const X = 110 + i * 270, Y = 588;
+      rr(x, X, Y, 240, 104, 18); x.fillStyle = "rgba(26,22,54,0.82)"; x.fill(); x.lineWidth = 4; x.strokeStyle = col; x.stroke();
+      portrait(x, X + 12, Y + 12, 70, k, col);
+      const pc = pct > 120 ? "#ff5a4d" : pct > 70 ? "#ffb04d" : "#ffffff";
+      txt(x, pct + "%", X + 160, Y + 46, 48, pc, "center", 8);
+      for (let l = 0; l < 3; l++) { x.beginPath(); x.arc(X + 124 + l * 22, Y + 84, 7, 0, 7); x.fillStyle = l < lives ? col : "#3b3570"; x.fill(); x.lineWidth = 3; x.strokeStyle = "#1a1636"; x.stroke(); }
+    });
+    if (ph > 0.84) txt(x, "KO!", 1060, 250, 90, gold(x, 210, 290), "center", 10);
+    txt(x, "1:48", W / 2, 50, 44, "#ffffff", "center", 8);
+  } };
+}
+
+/* ---------- 3 top-down arena ---------- */
+function topDown() {
+  const sc = new THREE.Scene(); sc.background = lin("#2a2a66");
+  tiles(sc, -7, 7, -4, 4, "#4fbfae", "#45b0a0");
+  for (let x = -8; x <= 8; x++) for (const z of [-5, 5]) add(sc, at(box(0.98, 1.1, 0.98, (x & 1) ? "#e6e1ff" : "#d8d2fb", { r: 0.7 }), x, 0.15, z));
+  for (let z = -4; z <= 4; z++) for (const x of [-8, 8]) add(sc, at(box(0.98, 1.1, 0.98, (z & 1) ? "#e6e1ff" : "#d8d2fb", { r: 0.7 }), x, 0.15, z));
+  for (const [x, z, w, d] of [[-3, -1.6, 2.6, 1.2], [3.2, 1.8, 2.6, 1.2], [0, 2.6, 1.2, 1.2], [0.4, -3, 1.2, 1.2]]) { add(sc, at(box(w, 0.7, d, "#ffb259"), x, 0.35, z)); add(sc, at(box(w - 0.2, 0.08, d - 0.2, "#ffd08a"), x, 0.74, z)); }
+  for (const [x, z] of [[-6, 3.2], [6, -3.2]]) { add(sc, at(cyl(0.4, 0.32, 0.6, "#ff7a5c"), x, 0.3, z)); add(sc, at(sph(0.55, "#3fae6a"), x, 0.95, z)); }
+  const se = chibi("se", { prop: true, ring: "#5fe08a" }), db = chibi("db", { ring: "#ff7a6b" });
+  se.g.position.set(-3.6, 0, 1.6); db.g.position.set(3.4, 0, -1.4); sc.add(se.g, db.g);
+  // aim line, brace-cage target ring, DBA zone
+  const dir = new THREE.Vector3(3.4 + 3.6, 0, -1.4 - 1.6), len = dir.length(); dir.normalize();
+  const aim = mesh(new THREE.PlaneGeometry(len - 0.8, 0.45), "#fff1a6", { basic: true, add: true, op: 0.5, side: THREE.DoubleSide }); aim.rotation.x = -Math.PI / 2; aim.rotation.z = Math.atan2(-dir.z, dir.x); aim.position.set(-3.6 + dir.x * len / 2, 0.06, 1.6 + dir.z * len / 2); sc.add(aim);
+  const target = mesh(new THREE.RingGeometry(1.0, 1.18, 48), "#ffc63a", { basic: true, add: true, op: 0.9, side: THREE.DoubleSide }); target.rotation.x = -Math.PI / 2; target.position.set(3.4, 0.07, -1.4); sc.add(target);
+  const zone = mesh(new THREE.CircleGeometry(1.8, 48), "#3fb8ff", { basic: true, add: true, op: 0.22, side: THREE.DoubleSide }); zone.rotation.x = -Math.PI / 2; zone.position.set(5.2, 0.05, 2.4); sc.add(zone);
+  const zr = mesh(new THREE.RingGeometry(1.72, 1.82, 48), "#9fe0ff", { basic: true, add: true, op: 0.9, side: THREE.DoubleSide }); zr.rotation.x = -Math.PI / 2; zr.position.set(5.2, 0.06, 2.4); sc.add(zr);
+  const shot = sprite("#ffd34d", 1.2), shotCore = at(sph(0.16, "#fff6c9", [1, 1, 1], { basic: true }), 0, 0, 0); sc.add(shot, shotCore);
+  lights(sc, { pos: [3, 14, 6] });
+  const c = cam(36, [0, 14.5, 8.5], [0, 0, 0.4]);
+  return { sc, c, update(t) {
+    se.g.rotation.y = Math.atan2(dir.x, dir.z); db.g.rotation.y = Math.atan2(-dir.x, -dir.z) + Math.sin(t) * 0.2;
+    se.aR.rotation.set(-0.3, 0, -2.2 + Math.sin(t * 2.6) * 0.35);
+    const ph = (t * 0.7) % 1; const p = new THREE.Vector3(-3.6 + dir.x * len * ph, 1.1, 1.6 + dir.z * len * ph); shot.position.copy(p); shotCore.position.copy(p);
+    target.scale.setScalar(1 + Math.sin(t * 4) * 0.06); zr.rotation.z = t;
+    db.g.position.x = 3.4 + Math.sin(t * 0.9) * 0.3;
+  }, hud(x) {
+    for (const [p, col, f, n] of [[se, "#5fe08a", 0.8, "You \u00b7 SE"], [db, "#ff7a6b", 0.52, "CPU \u00b7 DB"]]) { const [sx, sy] = proj(wpos(p.g, 2.6), this.c); bar(x, sx - 70, sy - 10, 140, 20, f, col === "#5fe08a" ? "#8dffa1" : "#ff8f7a", col === "#5fe08a" ? "#2fbf55" : "#e5383b"); txt(x, n, sx, sy - 26, 20, "#fff", "center", 5); }
+    stick(x, 140, 590, 80, -18, -20, "#3f7fe0");
+    stick(x, W - 150, 580, 80, 46, -28, "#ffc63a");
+    roundBtn(x, W - 300, 640, 40, "#9b8cff", "#5b45d6", ";"); roundBtn(x, W - 310, 540, 40, "#9b8cff", "#5b45d6", "{ }", 0.55); roundBtn(x, W - 250, 450, 40, "#9b8cff", "#5b45d6", "\u21bb");
+    txt(x, "Aim: Brace Cage", W - 150, 690, 22, gold(x, 680, 700), "center", 6);
+    hexTimer(x, W / 2, 58, 44, "62");
+  } };
+}
+
+/* ---------- 4 tag team ---------- */
+function tagTeam() {
+  const sc = new THREE.Scene(); sc.background = lin("#2a2a66");
+  tiles(sc, -10, 10, -3, 2, "#4fbfae", "#45b0a0"); add(sc, at(box(30, 12, 0.5, "#3a3a86", { r: 0.9 }), 0, 4, -6));
+  // partner benches at the back corners
+  for (const s of [-1, 1]) { add(sc, at(box(3.6, 0.8, 1.6, "#5b4fb8"), s * 6.4, 0.4, -2.6)); add(sc, at(box(3.7, 0.12, 1.7, "#ffc63a", { e: "#ffc63a", ei: 0.25 }), s * 6.4, 0.85, -2.6)); }
+  const se = chibi("se", { prop: true }), qa = chibi("qa", { prop: true }), db = chibi("db", { prop: true }), ds = chibi("ds");
+  se.g.position.set(-1.8, 0, 0.6); se.g.rotation.y = 0.9; db.g.position.set(1.8, 0, 0.6); db.g.rotation.y = -0.9;
+  qa.g.position.set(-6.4, 0.9, -2.6); qa.g.rotation.y = 0.5; ds.g.position.set(6.4, 0.9, -2.6); ds.g.rotation.y = -0.5;
+  sc.add(se.g, qa.g, db.g, ds.g);
+  const swirl = []; for (let i = 0; i < 10; i++) { const s = sprite("#c08bff", 0.6, 0.8); sc.add(s); swirl.push(s); }
+  const beam = at(mesh(new THREE.CylinderGeometry(0.6, 0.6, 5, 24, 1, true), "#c08bff", { basic: true, add: true, op: 0.2, side: THREE.DoubleSide }), -6.4, 3.4, -2.6); sc.add(beam);
+  lights(sc);
+  const c = cam(30, [0, 4.2, 15.5], [0, 1.6, -0.4]);
+  return { sc, c, update(t) {
+    se.aR.rotation.set(-0.3, 0, -2.2 + Math.sin(t * 2.6) * 0.4); qa.g.position.y = 0.9 + Math.abs(Math.sin(t * 4)) * 0.25;
+    swirl.forEach((s, i) => { const a = t * 3 + i * 0.63; s.position.set(-6.4 + Math.cos(a) * 1.1, 1.2 + (i / 10) * 2.2, -2.6 + Math.sin(a) * 1.1); });
+    ds.head.rotation.z = Math.sin(t * 1.5) * 0.08;
+  }, hud(x) {
+    const team = (left, a, b) => {
+      const X = left ? 28 : W - 28;
+      portrait(x, left ? X : X - 88, 22, 88, a[0], a[1]);
+      portrait(x, left ? X + 20 : X - 68, 118, 54, b[0], b[1], "#8a86c8");
+      bar(x, left ? X + 100 : X - 480, 34, 380, 30, a[2], left ? "#8dffa1" : "#ff8f7a", left ? "#2fbf55" : "#e5383b", !left);
+      bar(x, left ? X + 84 : X - 324, 132, 240, 18, b[2], "#c9c6ff", "#8a86c8", !left);
+      txt(x, a[3], left ? X + 100 : X - 100, 82, 22, "#fff", left ? "left" : "right", 5);
+      txt(x, b[3] + " (resting)", left ? X + 84 : X - 84, 166, 18, "#c9c6ff", left ? "left" : "right", 5);
+    };
+    team(true, ["SE", "#38c98a", 0.62, "Software Engineer"], ["QA", "#9b6bff", 0.9, "QA Analyst"]);
+    team(false, ["DB", "#ff9a3d", 0.48, "Database Admin"], ["DS", "#5fd0c0", 1, "Data Scientist"]);
+    hexTimer(x, W / 2, 62, 46, "71");
+    txt(x, "TAG IN!", 210, 380, 54, gold(x, 350, 410), "center", 9);
+    roundBtn(x, W - 140, 600, 64, "#c08bff", "#7a45d6", "TAG"); roundBtn(x, W - 270, 640, 44, "#ffe27a", "#f39a1c", "ASSIST");
+  } };
+}
+
+/* ---------- 5 roguelite ladder ---------- */
+function roguelite() {
+  const sc = new THREE.Scene(); sc.background = lin("#1c1848");
+  const floors = [["Fight", "na", "#3d6fd6"], ["Perk", null, "#ffc63a"], ["Fight", "qa", "#3d6fd6"], ["Shop", null, "#5fe08a"], ["Elite", "cs", "#a86bff"], ["Boss", "db", "#ff5a4d"]];
+  const people = [], current = 2;
+  floors.forEach(([kind, who, col], i) => {
+    const y = i * 1.7;
+    add(sc, at(box(8, 0.3, 3, "#d8d2fb", { r: 0.7 }), 0, y, 0));
+    add(sc, at(box(8, 1.4, 0.2, i === current ? "#4a4fb0" : "#36327a", { r: 0.8 }), 0, y + 0.85, -1.4));
+    add(sc, at(box(8.04, 0.1, 0.06, col, { basic: true }), 0, y + 0.2, 1.53));
+    for (const s of [-1, 1]) add(sc, at(box(0.2, 1.6, 3, "#5b4fb8"), s * 4.1, y + 0.8, 0));
+    if (who) { const p = chibi(who, { scale: kind === "Boss" ? 0.95 : 0.58, prop: who === "db" || who === "qa" }); p.g.position.set(1.6, y + 0.15, 0.2); p.g.rotation.y = -0.6; sc.add(p.g); people.push(p); }
+    if (kind === "Perk") { const c = at(box(0.5, 0.7, 0.08, "#ffc63a", { e: "#ffc63a", ei: 0.4 }), 0.6, y + 0.65, 0.2); sc.add(c); people.push({ card: c }); const g = sprite("#ffc63a", 1.8, 0.6); g.position.set(0.6, y + 0.7, 0.3); sc.add(g); }
+    if (kind === "Shop") add(sc, at(box(1.2, 0.6, 0.6, "#5fe08a"), 0.8, y + 0.45, 0));
+    if (kind === "Boss") { const a = sprite("#ff5a4d", 3.4, 0.5); a.position.set(1.6, y + 1.0, 0); sc.add(a); }
+  });
+  const shaft = at(box(1.4, 11, 1.4, "#2b2570", { r: 0.5 }), -5.1, 4.6, 0); sc.add(shaft);
+  const car = at(box(1.2, 1.3, 1.3, "#ffc63a", { e: "#ffc63a", ei: 0.2 }), -5.1, current * 1.7 + 0.8, 0.1); sc.add(car);
+  const hero = chibi("se", { prop: true, scale: 0.58 }); hero.g.position.set(-1.6, current * 1.7 + 0.15, 0.3); hero.g.rotation.y = 0.6; sc.add(hero.g);
+  const hglow = sprite("#7dffcf", 2.2, 0.5); sc.add(hglow);
+  lights(sc, { sky: "#e8e4ff", ground: "#2a2060", amb: 0.8, pos: [6, 10, 10] });
+  const c = cam(40, [-0.5, 5.6, 17.5], [-0.5, 5.3, 0]);
+  return { sc, c, floors, update(t) { hero.aR.rotation.set(-0.3, 0, -2.2 + Math.sin(t * 2.6) * 0.4); hglow.position.set(-1.6, current * 1.7 + 0.8, 0.4); hglow.material.opacity = 0.35 + Math.sin(t * 3) * 0.12; people.forEach((p) => { if (p.card) p.card.rotation.y = t * 1.5; }); car.position.y = current * 1.7 + 0.8 + Math.sin(t * 2) * 0.03; },
+    hud(x) {
+      this.floors.forEach(([kind, who], i) => {
+        const [sx, sy] = proj(new THREE.Vector3(4.3, i * 1.7 + 0.8, 1.5), this.c);
+        const done = i < current, here = i === current;
+        rr(x, sx + 10, sy - 26, 370, 52, 14); x.fillStyle = here ? "rgba(63,184,255,0.9)" : done ? "rgba(26,22,54,0.55)" : "rgba(26,22,54,0.85)"; x.fill(); x.lineWidth = 4; x.strokeStyle = "#1a1636"; x.stroke();
+        txt(x, `Floor ${i + 1} \u00b7 ${kind}${who ? ": " + JOBS[who].name : ""}`, sx + 24, sy, 22, done ? "#8f8ab8" : "#ffffff", "left", 5);
+        if (done) txt(x, "\u2713", sx + 362, sy, 26, "#5fe08a", "right", 5);
+      });
+      rr(x, 20, 24, 300, 180, 18); x.fillStyle = "rgba(26,22,54,0.85)"; x.fill();
+      txt(x, "Run 7 \u00b7 Floor 3 of 6", 40, 54, 24, "#fff", "left", 6);
+      txt(x, "Perks held", 40, 96, 20, "#c9c6ff", "left", 5);
+      ["#3fb8ff", "#ffc63a", "#3fb8ff"].forEach((col, i) => { rr(x, 150 + i * 54, 80, 46, 46, 10); x.fillStyle = col; x.fill(); x.lineWidth = 4; x.strokeStyle = "#1a1636"; x.stroke(); txt(x, ["SO", "PR", "KB"][i], 173 + i * 54, 104, 18, "#fff", "center", 4); });
+      bar(x, 40, 140, 260, 22, 0.66, "#8dffa1", "#2fbf55"); txt(x, "HP carries over", 170, 182, 18, "#c9c6ff", "center", 4);
+    } };
+}
+
+/* ---------- 6 objective 3v3 ---------- */
+function objective() {
+  const sc = new THREE.Scene(); sc.background = lin("#2a2a66");
+  tiles(sc, -9, 9, -5, 5, "#4fbfae", "#45b0a0");
+  for (let x = -10; x <= 10; x++) for (const z of [-6, 6]) add(sc, at(box(0.98, 1.1, 0.98, (x & 1) ? "#e6e1ff" : "#d8d2fb", { r: 0.7 }), x, 0.15, z));
+  for (let z = -5; z <= 5; z++) for (const x of [-10, 10]) add(sc, at(box(0.98, 1.1, 0.98, (z & 1) ? "#e6e1ff" : "#d8d2fb", { r: 0.7 }), x, 0.15, z));
+  for (const s of [-1, 1]) { add(sc, at(box(3, 0.15, 3, s < 0 ? "#3fb8ff" : "#ff7a6b", { basic: true, op: 0.4 }), s * 8, 0.02, 0)); for (const z of [-3, 3]) add(sc, at(box(2, 0.7, 1, "#ffb259"), s * 4.6, 0.35, z)); }
+  add(sc, at(box(1.2, 2.6, 1, "#2f3170"), 0, 1.3, 0));
+  for (let k = 0; k < 9; k++) add(sc, at(box(0.12, 0.12, 0.03, ["#6dff9a", "#3fb8ff", "#ffc63a"][k % 3], { basic: true }), -0.3 + (k % 3) * 0.3, 0.6 + Math.floor(k / 3) * 0.6, 0.52));
+  const zone = mesh(new THREE.RingGeometry(2.6, 2.9, 64), "#ffffff", { basic: true, op: 0.5, side: THREE.DoubleSide }); zone.rotation.x = -Math.PI / 2; zone.position.y = 0.05; sc.add(zone);
+  const prog = new THREE.Mesh(new THREE.RingGeometry(2.6, 2.9, 64, 1, 0, Math.PI * 2 * 0.62), M("#3fb8ff", { basic: true, add: true, op: 0.95, side: THREE.DoubleSide })); prog.rotation.x = -Math.PI / 2; prog.position.y = 0.07; sc.add(prog);
+  const beam = at(mesh(new THREE.CylinderGeometry(2.6, 2.6, 4, 48, 1, true), "#3fb8ff", { basic: true, add: true, op: 0.1, side: THREE.DoubleSide }), 0, 2, 0); sc.add(beam);
+  const blue = [["se", -2, 1.4], ["pm", -3.2, -1.8], ["ux", -6, 2.2]], red = [["db", 2.2, -1], ["cs", 3.6, 2], ["na", 6.2, -2.6]], all = [];
+  for (const [k, x, z] of blue) { const p = chibi(k, { ring: "#3fb8ff", prop: k !== "ux" }); p.g.position.set(x, 0, z); p.g.rotation.y = Math.atan2(-x, -z); sc.add(p.g); all.push(p); }
+  for (const [k, x, z] of red) { const p = chibi(k, { ring: "#ff7a6b", prop: k === "db" }); p.g.position.set(x, 0, z); p.g.rotation.y = Math.atan2(-x, -z); sc.add(p.g); all.push(p); }
+  lights(sc, { pos: [3, 15, 7] });
+  const c = cam(38, [0, 17, 10], [0, 0, 0.6]);
+  return { sc, c, all, update(t) { all.forEach((p, i) => { p.g.position.y = Math.abs(Math.sin(t * 3 + i)) * 0.06; }); all[0].aR.rotation.set(-0.3, 0, -2.2 + Math.sin(t * 2.6) * 0.35); beam.material.opacity = 0.08 + Math.sin(t * 3) * 0.03; },
+    hud(x) {
+      rr(x, W / 2 - 300, 24, 600, 56, 28); x.fillStyle = "#1a1636"; x.fill();
+      rr(x, W / 2 - 294, 30, 588 * 0.62, 44, 22); x.fillStyle = "#3fb8ff"; x.fill();
+      rr(x, W / 2 - 294 + 588 * 0.62, 30, 588 * 0.38, 44, 22); x.fillStyle = "#ff7a6b"; x.fill();
+      txt(x, "Blue 62%", W / 2 - 270, 52, 28, "#fff", "left", 6); txt(x, "Orange 38%", W / 2 + 270, 52, 28, "#fff", "right", 6);
+      txt(x, "CAPTURING SERVER", W / 2, 112, 30, gold(x, 98, 126), "center", 7);
+      this.all.forEach((p, i) => { const [sx, sy] = proj(wpos(p.g, 2.4), this.c); bar(x, sx - 50, sy - 8, 100, 16, [0.8, 0.5, 0.9, 0.6, 0.75, 0.4][i], i < 3 ? "#8fd4ff" : "#ff8f7a", i < 3 ? "#2f8fe0" : "#e5383b"); });
+      ["SE", "PM", "UX"].forEach((n, i) => portrait(x, 28 + i * 70, 24, 60, n, ["#38c98a", "#ff5d7a", "#ffcf4d"][i], "#3fb8ff"));
+      ["DB", "CS", "NA"].forEach((n, i) => portrait(x, W - 88 - i * 70, 24, 60, n, ["#ff9a3d", "#2f4f5f", "#4db6ff"][i], "#ff7a6b"));
+      txt(x, "2:14", W / 2, 150, 30, "#fff", "center", 6);
+    } };
+}
+
+/* ---------- 7 card fighter ---------- */
+function cards() {
+  const sc = new THREE.Scene(); sc.background = lin("#2a2a66");
+  tiles(sc, -7, 7, -2, 2, "#4fbfae", "#45b0a0"); cubicleRow(sc, -3.2, -8, 8); add(sc, at(box(30, 12, 0.5, "#3a3a86", { r: 0.9 }), 0, 4, -5));
+  const se = chibi("se", { prop: true }), db = chibi("db", { prop: true });
+  se.g.position.set(-2.6, 0, 0.6); se.g.rotation.y = 0.8; db.g.position.set(2.6, 0, 0.6); db.g.rotation.y = -0.8; sc.add(se.g, db.g);
+  const card = at(box(0.7, 1, 0.05, "#a86bff", { e: "#a86bff", ei: 0.5 }), 0, 2.6, 0.6); sc.add(card); const cg = sprite("#c08bff", 2.4, 0.6); sc.add(cg);
+  lights(sc);
+  const c = cam(30, [0, 2.6, 12.5], [0, 0.9, 0]);
+  return { sc, c, update(t) { const ph = (t * 0.5) % 1; card.position.set(-2.6 + ph * 5, 2.2 + Math.sin(ph * Math.PI) * 1.4, 0.6); card.rotation.set(0, ph * 6, ph * 2); cg.position.copy(card.position); se.aR.rotation.set(-0.3, 0, -2 + Math.sin(t * 2) * 0.2); },
+    hud(x) {
+      bar(x, 40, 30, 360, 30, 0.7, "#8dffa1", "#2fbf55"); bar(x, W - 400, 30, 360, 30, 0.55, "#ff8f7a", "#e5383b", true);
+      txt(x, "Software Engineer \u00b7 70", 40, 82, 22, "#fff", "left", 5); txt(x, "Database Admin \u00b7 55", W - 40, 82, 22, "#fff", "right", 5);
+      rr(x, W / 2 - 110, 24, 220, 60, 18); x.fillStyle = gold(x, 24, 84); x.fill(); x.lineWidth = 5; x.strokeStyle = "#1a1636"; x.stroke(); txt(x, "YOUR TURN", W / 2, 55, 30, "#fff", "center", 6);
+      const [ix, iy] = proj(wpos(db.g, 3.2), this.c);
+      rr(x, ix - 70, iy - 30, 140, 46, 14); x.fillStyle = "rgba(26,22,54,0.85)"; x.fill(); x.lineWidth = 4; x.strokeStyle = "#3fb8ff"; x.stroke(); txt(x, "Next: Guard 30", ix, iy - 7, 20, "#9fe0ff", "center", 4);
+      for (let i = 0; i < 10; i++) { x.save(); x.translate(60 + i * 30, 640); x.rotate(Math.PI / 4); x.fillStyle = i < 7 ? "#ffc63a" : "#3b3570"; x.fillRect(-10, -10, 20, 20); x.lineWidth = 3; x.strokeStyle = "#1a1636"; x.strokeRect(-10, -10, 20, 20); x.restore(); }
+      txt(x, "Motivation 7/10", 60, 600, 24, "#fff", "left", 5);
+      const hand = [["Semicolon Strike", ";", 2, "#a86bff", "45 dmg, interrupts"], ["Brace Cage", "{ }", 3, "#a86bff", "Trap 1 turn"], ["Basic Swing", "KB", 1, "#ff9b4d", "25 dmg"], ["Recursion", "\u21bb", 4, "#a86bff", "3 \u00d7 30 dmg"], ["Burnout", "zzz", 0, "#5c5a78", "Unplayable"]];
+      hand.forEach(([n, g, cost, col, eff], i) => {
+        const cx = 740 + (i - 2) * 132, cy = 600 + Math.abs(i - 2) * 14, lift = i === 1 ? -40 : 0;
+        x.save(); x.translate(cx, cy + lift); x.rotate((i - 2) * 0.06);
+        rr(x, -62, -90, 124, 180, 16); const gr = x.createLinearGradient(0, -90, 0, 90); gr.addColorStop(0, col); gr.addColorStop(1, "#241f55"); x.fillStyle = gr; x.fill(); x.lineWidth = 5; x.strokeStyle = i === 1 ? "#ffc63a" : "#1a1636"; x.stroke();
+        txt(x, g, 0, -26, 40, "#fff", "center", 7); txt(x, n, 0, 26, 16, "#fff", "center", 4);
+        x.font = "600 13px Inter, sans-serif"; x.fillStyle = "#e7e3ff"; x.textAlign = "center"; x.fillText(eff, 0, 54);
+        x.beginPath(); x.arc(-50, -78, 18, 0, 7); x.fillStyle = "#ffc63a"; x.fill(); x.lineWidth = 4; x.strokeStyle = "#1a1636"; x.stroke(); txt(x, String(cost), -50, -76, 22, "#fff", "center", 4);
+        x.restore();
+      });
+      roundBtn(x, W - 90, 620, 58, "#6ee07a", "#2fae4a", "END");
+    } };
+}
+
+/* ---------- loop ---------- */
+const builders = [sideView, platform, topDown, tagTeam, roguelite, objective, cards];
+const canvases = [...document.querySelectorAll(".frame canvas")];
+const views = builders.map((b, i) => { const v = b(); v.ctx = canvases[i].getContext("2d"); v.vis = false; return v; });
+if ("IntersectionObserver" in window) { const io = new IntersectionObserver((es) => es.forEach((e) => { const v = views.find((q) => q.ctx.canvas === e.target); if (v) v.vis = e.isIntersecting; })); views.forEach((v) => io.observe(v.ctx.canvas)); } else views.forEach((v) => (v.vis = true));
+function draw(t, all) { for (const v of views) { if (!all && !v.vis) continue; v.update(t); renderer.render(v.sc, v.c); v.ctx.clearRect(0, 0, W, H); v.ctx.drawImage(renderer.domElement, 0, 0); v.hud(v.ctx, t); } }
+const start = () => { draw(1.2, true); if (reduce) return; let last = 0; const loop = (now) => { if (now - last > 33) { last = now; draw(now / 1000, false); } requestAnimationFrame(loop); }; requestAnimationFrame(loop); };
+(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(start);
+})();
+</script>

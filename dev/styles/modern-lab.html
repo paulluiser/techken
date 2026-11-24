@@ -1,0 +1,464 @@
+<title>Techken Modern Looks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Inter:wght@400;600&family=Fredoka:wght@500;700&family=Bangers&family=Chakra+Petch:wght@600&family=Gochi+Hand&display=swap">
+<style>
+  /* Layout: a gallery of six live frames of the same fight, each with its cost and fit. Deliberately one dark theme so every render sits on the same neutral ground. */
+  :root {
+    --bg: #101119; --panel: #181a26; --line: #2b2e42; --fg: #eceaf4; --dim: #a3a6bd;
+    --accent: #8f7bff; --low: #4fe0a0; --mid: #5cc8ff; --high: #ff8a6b;
+    --display: 'Unbounded', system-ui, sans-serif; --body: 'Inter', system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { background: var(--bg); color: var(--fg); }
+  body { font: 15px/1.55 var(--body); margin: 0; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding-block: 32px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  header { display: grid; gap: 12px; margin-bottom: 28px; }
+  h1 { font: 700 26px/1.25 var(--display); margin: 0; letter-spacing: -0.3px; text-wrap: balance; }
+  h1 span { color: var(--accent); }
+  header p { margin: 0; max-width: 70ch; color: var(--dim); }
+  header p b { color: var(--fg); font-weight: 600; }
+  .group { font: 500 13px/1 var(--display); letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim); margin: 30px 0 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 22px; }
+  figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: grid; grid-template-rows: auto 1fr; }
+  .shot { position: relative; background: #000; }
+  .shot canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; }
+  .shot .n { position: absolute; top: 10px; left: 10px; font: 700 12px/1 var(--display); background: rgba(16,17,25,0.8); color: var(--fg); padding: 6px 8px; border-radius: 6px; }
+  figcaption { padding: 16px 18px 18px; display: grid; gap: 8px; min-width: 0; }
+  .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  h2 { font: 700 15px/1.3 var(--display); margin: 0; }
+  .cost { font: 600 12px/1 var(--body); letter-spacing: 0.8px; padding: 5px 9px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+  .cost.low { color: var(--low); } .cost.mid { color: var(--mid); } .cost.high { color: var(--high); }
+  figcaption p { margin: 0; color: var(--dim); }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--fg); }
+  .meta span b { color: var(--dim); font-weight: 400; }
+  .note { margin-top: 34px; border-top: 1px solid var(--line); padding-top: 22px; color: var(--dim); max-width: 78ch; display: grid; gap: 8px; }
+  .note b { color: var(--fg); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Techken, <span>modern</span> looks</h1>
+    <p>Six directions that drop pixel art entirely. Each frame is the same moment: the <b>Software Engineer</b> swings a keyboard at the <b>Database Admin</b>, who guards behind a database stack, with a QA bug on the floor and a coffee pickup on the shelf. The characters here are quick code-built stand-ins, so judge the <b>look and mood</b>, not the finished detail.</p>
+  </header>
+  <div class="group">3D, fights stay side-on (2.5D)</div>
+  <div class="grid" id="g3"></div>
+  <div class="group">2D vector, skeletal animation</div>
+  <div class="grid" id="g2"></div>
+  <div class="note">
+    <p><b>The gameplay doesn't change with any of these.</b> The simulation, netcode and hitboxes stay exactly as they are. Only the renderer and the art pipeline are replaced.</p>
+    <p><b>Animation also gets smoother.</b> 3D and vector rigs animate with bones, so a new move is a new animation clip instead of hand-drawing every frame.</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+const W = 960, H = 540;
+const JOB = {
+  se: { hair: "#2d2a4a", top: "#3fb37f", pants: "#2b3150", skin: "#ffd9c2", shoe: "#f4f4f8", prop: "#3a3f55" },
+  db: { hair: "#6b3e22", top: "#e0873c", pants: "#3a3550", skin: "#f2c39e", shoe: "#3a3550", prop: "#3f7fe0" },
+};
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const mk = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+const mix = (a, b, t) => { const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); const x = p(a), y = p(b); return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join(""); };
+
+/* ---------- shared HUD ---------- */
+function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function hud(ctx, k) {
+  const L = { hp: [0.72, 0.41], mot: [0.6, 0.35] };
+  ctx.save();
+  if (k === "clay" || k === "flat") {
+    const bar = (x, i, rev) => {
+      ctx.shadowColor = "rgba(40,20,80,0.25)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4;
+      ctx.fillStyle = "#ffffff"; rr(ctx, x, 22, 330, 30, 15); ctx.fill(); ctx.shadowColor = "transparent";
+      const w = 316 * L.hp[i]; const g = ctx.createLinearGradient(0, 0, 0, 52); g.addColorStop(0, "#7ef0b6"); g.addColorStop(1, "#3fc98a");
+      ctx.fillStyle = g; rr(ctx, rev ? x + 323 - w : x + 7, 29, w, 16, 8); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.9)"; rr(ctx, x + 20, 60, 220, 9, 4.5); ctx.fill();
+      ctx.fillStyle = "#ffc94a"; rr(ctx, rev ? x + 20 + 220 - 220 * L.mot[i] : x + 20, 60, 220 * L.mot[i], 9, 4.5); ctx.fill();
+      ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(rev ? x + 360 : x - 30, 40, 26, 0, 7); ctx.fill();
+      ctx.fillStyle = "#4a3f7a"; ctx.font = "700 18px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(i ? "DB" : "SE", rev ? x + 360 : x - 30, 41);
+    };
+    bar(70, 0, false); bar(560, 1, true);
+    ctx.fillStyle = "#ffffff"; rr(ctx, 448, 16, 64, 50, 14); ctx.fill();
+    ctx.fillStyle = "#4a3f7a"; ctx.font = "700 30px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("62", 480, 42);
+  } else if (k === "toon") {
+    const bar = (x, i, rev) => {
+      ctx.save(); ctx.translate(x, 0); if (rev) { ctx.translate(360, 0); ctx.scale(-1, 1); }
+      const sk = (y, w, h) => { ctx.beginPath(); ctx.moveTo(14, y); ctx.lineTo(14 + w, y); ctx.lineTo(w, y + h); ctx.lineTo(0, y + h); ctx.closePath(); };
+      ctx.fillStyle = "#1a1530"; sk(22, 360, 30); ctx.fill();
+      ctx.fillStyle = "#ffe14d"; sk(26, 352 * L.hp[i] + 4, 22); ctx.fill();
+      ctx.fillStyle = "#ff4d6d"; sk(26, 352 * L.hp[i] * 0.94, 22); ctx.fill();
+      ctx.fillStyle = "#1a1530"; sk(58, 230, 12); ctx.fill(); ctx.fillStyle = "#4dd8ff"; sk(60, 226 * L.mot[i], 8); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#1a1530"; ctx.lineWidth = 6; ctx.font = "34px Bangers, sans-serif"; ctx.textAlign = rev ? "right" : "left";
+      ctx.strokeText(i ? "DATABASE ADMIN" : "SOFTWARE ENGINEER", rev ? x + 350 : x + 10, 104); ctx.fillText(i ? "DATABASE ADMIN" : "SOFTWARE ENGINEER", rev ? x + 350 : x + 10, 104);
+    };
+    bar(40, 0, false); bar(560, 1, true);
+    ctx.font = "64px Bangers, sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 8; ctx.strokeStyle = "#1a1530"; ctx.fillStyle = "#ffe14d"; ctx.strokeText("62", 480, 76); ctx.fillText("62", 480, 76);
+  } else if (k === "low" || k === "neon") {
+    const c1 = k === "neon" ? "#ff3df2" : "#ffd29a", c2 = k === "neon" ? "#3df7ff" : "#ff8a5c";
+    if (k === "neon") { ctx.shadowColor = c2; ctx.shadowBlur = 14; }
+    const bar = (x, i, rev) => {
+      ctx.strokeStyle = c1; ctx.lineWidth = 2; ctx.strokeRect(x, 26, 340, 18);
+      ctx.fillStyle = c2; const w = 334 * L.hp[i]; ctx.fillRect(rev ? x + 337 - w : x + 3, 29, w, 12);
+      ctx.fillStyle = c1; ctx.fillRect(rev ? x + 340 - 200 * L.mot[i] : x, 52, 200 * L.mot[i], 4);
+      ctx.font = "600 18px 'Chakra Petch', sans-serif"; ctx.textAlign = rev ? "right" : "left"; ctx.fillText(i ? "DBA // GUARDING" : "SE // CHARGED", rev ? x + 340 : x, 80);
+    };
+    bar(50, 0, false); bar(570, 1, true);
+    ctx.font = "600 40px 'Chakra Petch', sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = c1; ctx.fillText("62", 480, 54);
+  } else if (k === "paper") {
+    const bar = (x, i, rev) => {
+      ctx.save(); ctx.shadowColor = "rgba(60,40,20,0.35)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 4;
+      ctx.fillStyle = "#fffdf6"; ctx.beginPath(); ctx.moveTo(x - 6, 20); ctx.lineTo(x + 346, 16); ctx.lineTo(x + 344, 58); ctx.lineTo(x - 4, 60); ctx.fill(); ctx.restore();
+      ctx.fillStyle = "#e5533d"; const w = 320 * L.hp[i]; ctx.fillRect(rev ? x + 330 - w : x + 8, 28, w, 20);
+      ctx.fillStyle = "#3b3226"; ctx.font = "30px 'Gochi Hand', cursive"; ctx.textAlign = rev ? "right" : "left"; ctx.fillText(i ? "Database Admin" : "Software Engineer", rev ? x + 340 : x, 94);
+    };
+    bar(50, 0, false); bar(570, 1, true);
+    ctx.fillStyle = "#ffd84d"; ctx.save(); ctx.translate(480, 42); ctx.rotate(-0.06); ctx.fillRect(-38, -30, 76, 60); ctx.restore();
+    ctx.fillStyle = "#3b3226"; ctx.font = "46px 'Gochi Hand', cursive"; ctx.textAlign = "center"; ctx.fillText("62", 480, 58);
+  }
+  ctx.restore();
+}
+
+/* ---------- 3D ---------- */
+const has3D = typeof THREE !== "undefined";
+let renderer = null;
+const scenes = [];
+function build3D(style) {
+  const seg = style === "low" ? 7 : style === "clay" ? 40 : 28;
+  const pal = {
+    clay: { wall: "#e7def3", floor: "#cbbfe6", sky: "#ffd3bd", city: "#e7b7c8", desk: "#fff6ea", leg: "#b9acd6", mon: "#6f63a8", screen: "#9ff0d0", plant: "#8fd6a8", pot: "#ff9f8a", bg: "#e7def3" },
+    toon: { wall: "#f4f1ff", floor: "#6d7fc9", sky: "#79c8ff", city: "#4a7fd6", desk: "#ffbf5e", leg: "#3a3560", mon: "#2e2a4a", screen: "#7dffcf", plant: "#41c46d", pot: "#ff6d4d", bg: "#f4f1ff" },
+    low:  { wall: "#4d3f78", floor: "#2c2550", sky: "#ff9466", city: "#2a1f48", desk: "#c98b5e", leg: "#1f1a38", mon: "#1a1630", screen: "#5cf0ff", plant: "#3f9b74", pot: "#d0644a", bg: "#2c2550" },
+  }[style];
+  let grad = null;
+  if (style === "toon") { const d = new Uint8Array([90, 90, 90, 255, 170, 170, 170, 255, 255, 255, 255, 255]); grad = new THREE.DataTexture(d, 3, 1, THREE.RGBAFormat); grad.minFilter = grad.magFilter = THREE.NearestFilter; grad.needsUpdate = true; }
+  const outline = new THREE.MeshBasicMaterial({ color: 0x1a1530, side: THREE.BackSide });
+  outline.onBeforeCompile = (sh) => { sh.vertexShader = sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed += normal * 0.028;"); };
+  const mats = new Map();
+  const M = (color, basic) => {
+    const key = color + (basic ? "b" : "");
+    if (mats.has(key)) return mats.get(key);
+    let m;
+    const c = style === "clay" ? mix(color, "#ffffff", 0.18) : color;
+    if (basic) m = new THREE.MeshBasicMaterial({ color: c });
+    else if (style === "toon") m = new THREE.MeshToonMaterial({ color: c, gradientMap: grad });
+    else m = new THREE.MeshStandardMaterial({ color: c, roughness: style === "clay" ? 0.92 : 0.8, metalness: 0, flatShading: style === "low" });
+    mats.set(key, m); return m;
+  };
+  const toOutline = [];
+  const mesh = (geo, color, opt = {}) => { const m = new THREE.Mesh(geo, M(color, opt.basic)); m.castShadow = !opt.basic; m.receiveShadow = true; if (opt.out !== false && !opt.basic) toOutline.push(m); return m; };
+  const sph = (r, c, sx = 1, sy = 1, sz = 1, o) => { const m = mesh(new THREE.SphereGeometry(r, seg, Math.max(5, Math.round(seg * 0.75))), c, o); m.scale.set(sx, sy, sz); return m; };
+  const cyl = (rt, rb, h, c, o) => mesh(new THREE.CylinderGeometry(rt, rb, h, seg), c, o);
+  const box = (w, h, d, c, o) => mesh(new THREE.BoxGeometry(w, h, d), c, o);
+  const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(pal.bg);
+  if (style === "clay") scene.fog = new THREE.Fog(pal.bg, 18, 34);
+
+  // room
+  scene.add(at(box(24, 0.4, 10, pal.floor, { out: false }), 0, -0.2, 0.5));
+  scene.add(at(box(24, 12, 0.3, pal.wall, { out: false }), 0, 5.5, -3));
+  for (const x of [-6, -2, 2, 6]) {
+    scene.add(at(box(3, 2.6, 0.1, pal.sky, { basic: true }), x, 5, -2.82));
+    for (let k = 0; k < 4; k++) { const h = 0.5 + ((x * 7 + k * 13) % 5) * 0.22; scene.add(at(box(0.55, h, 0.05, pal.city, { basic: true }), x - 1.1 + k * 0.72, 3.7 + h / 2, -2.76)); }
+    scene.add(at(box(3.2, 0.16, 0.2, pal.desk, { out: false }), x, 3.62, -2.7));
+    if (style === "toon") { scene.add(at(sph(0.3, "#ffffff", 1.6, 0.8, 0.2, { basic: true }), x + 0.6, 5.8, -2.74)); scene.add(at(sph(0.22, "#ffffff", 1.6, 0.8, 0.2, { basic: true }), x + 0.2, 5.75, -2.73)); }
+  }
+  // desks (platforms) and the centre shelf
+  for (const s of [-1, 1]) {
+    const x = s * 5.2;
+    scene.add(at(box(3.2, 0.2, 1.3, pal.desk), x, 2.3, -0.8));
+    for (const dx of [-1.4, 1.4]) for (const dz of [-1.3, -0.3]) scene.add(at(cyl(0.07, 0.07, 2.2, pal.leg), x + dx, 1.1, dz));
+    scene.add(at(box(1.1, 0.7, 0.08, pal.mon), x + s * 0.4, 2.85, -1.2));
+    scene.add(at(box(0.98, 0.58, 0.02, pal.screen, { basic: true }), x + s * 0.4, 2.85, -1.15));
+    scene.add(at(cyl(0.05, 0.05, 0.35, pal.mon), x + s * 0.4, 2.5, -1.2));
+  }
+  scene.add(at(box(3.2, 0.18, 1, pal.desk), 0, 3.3, -1.6));
+  // plant
+  scene.add(at(cyl(0.35, 0.28, 0.7, pal.pot), -7.6, 0.35, -1.5));
+  for (const [dx, dy, r] of [[0, 1.1, 0.55], [-0.35, 0.9, 0.4], [0.35, 0.95, 0.42], [0, 1.55, 0.35]]) scene.add(at(sph(r, pal.plant), -7.6 + dx, dy, -1.5));
+  // coffee pickup
+  const cup = new THREE.Group();
+  cup.add(at(cyl(0.2, 0.15, 0.42, "#ffffff"), 0, 0, 0));
+  cup.add(at(cyl(0.18, 0.18, 0.02, "#6b3e22", { out: false }), 0, 0.2, 0));
+  cup.add(at(cyl(0.21, 0.19, 0.14, "#ff6d4d"), 0, -0.02, 0));
+  const handle = mesh(new THREE.TorusGeometry(0.11, 0.035, 8, seg), "#ffffff"); handle.position.set(0.22, 0.02, 0); cup.add(handle);
+  cup.position.set(0, 3.85, -1.6); scene.add(cup);
+  // QA bug
+  const bug = new THREE.Group();
+  bug.add(at(sph(0.26, "#5cc95c", 1.2, 0.75, 1), 0, 0.22, 0));
+  bug.add(at(sph(0.14, "#2a2f45"), -0.32, 0.26, 0));
+  for (const z of [-0.18, 0, 0.18]) for (const sx of [-1, 1]) { const l = at(cyl(0.025, 0.025, 0.28, "#2a2f45", { out: false }), z * 1.2, 0.08, sx * 0.24); l.rotation.x = sx * 0.9; bug.add(l); }
+  bug.position.set(3.6, 0, 1.4); scene.add(bug);
+
+  // chibi
+  function chibi(j, who) {
+    const g = new THREE.Group(), head = new THREE.Group();
+    for (const s of [-1, 1]) { g.add(at(cyl(0.11, 0.11, 0.36, j.pants), s * 0.14, 0.24, 0)); g.add(at(sph(0.14, j.shoe, 1, 0.6, 1.4), s * 0.14, 0.08, 0.06)); }
+    g.add(at(cyl(0.28, 0.37, 0.62, j.top), 0, 0.72, 0));
+    g.add(at(sph(0.3, mix(j.top, "#000000", 0.18), 1, 0.35, 1), 0, 1.02, 0));
+    head.position.set(0, 1.58, 0); g.add(head);
+    head.add(sph(0.56, j.skin, 1.05, 0.95, 1));
+    const cap = mesh(new THREE.SphereGeometry(0.6, seg, seg, 0, Math.PI * 2, 0, 1.7), j.hair); cap.position.set(0, 0.04, -0.03); head.add(cap);
+    head.add(at(sph(0.56, j.hair), 0, -0.02, -0.14));
+    for (const x of [-0.28, 0, 0.28]) head.add(at(sph(0.19, j.hair, 1.05, 0.8, 0.6), x, 0.28, 0.42));
+    for (const s of [-1, 1]) {
+      head.add(at(sph(0.1, "#241f3d", 0.78, 1.25, 0.35, { out: false }), s * 0.2, -0.04, 0.52));
+      head.add(at(sph(0.035, "#ffffff", 1, 1, 1, { basic: true }), s * 0.2 - 0.03, 0.03, 0.565));
+      head.add(at(sph(0.07, "#ff9fb0", 1.3, 0.6, 0.3, { out: false }), s * 0.33, -0.17, 0.46));
+    }
+    const pivot = (s) => { const p = new THREE.Group(); p.position.set(s * 0.38, 0.92, 0); p.add(at(cyl(0.085, 0.085, 0.48, j.top), 0, -0.24, 0)); p.add(at(sph(0.11, j.skin), 0, -0.5, 0)); g.add(p); return p; };
+    const armR = pivot(-1), armL = pivot(1);
+    const parts = { g, head, armR, armL };
+    if (who === "se") {
+      for (const [x, y, r] of [[-0.2, 0.55, 0.5], [0.15, 0.6, -0.3], [0, 0.62, 0.1]]) { const c = mesh(new THREE.ConeGeometry(0.13, 0.4, seg), j.hair); c.position.set(x, y, 0); c.rotation.z = r; head.add(c); }
+      for (const s of [-1, 1]) { const ring = mesh(new THREE.TorusGeometry(0.15, 0.022, 8, seg), "#2a2f45", { out: false }); ring.position.set(s * 0.2, -0.04, 0.58); head.add(ring); }
+      const kb = new THREE.Group(); kb.add(box(0.8, 0.08, 0.28, j.prop)); kb.add(at(box(0.7, 0.03, 0.2, "#e9ecf7", { out: false }), 0, 0.05, 0)); kb.position.set(0, -0.6, 0.12); kb.rotation.set(0.2, 0, 1.4); armR.add(kb);
+      armL.rotation.set(0.5, 0, -0.35);
+    } else {
+      head.add(at(sph(0.2, j.hair), 0, 0.62, -0.18));
+      head.add(at(sph(0.42, j.hair, 1, 0.6, 0.8), 0, -0.3, 0.12));
+      armR.rotation.set(-1.25, 0, 0.25); armL.rotation.set(-1.25, 0, -0.25);
+      const db = new THREE.Group();
+      for (let k = 0; k < 3; k++) { db.add(at(cyl(0.38, 0.38, 0.17, j.prop), 0, k * 0.2, 0)); db.add(at(sph(0.035, "#6dff9a", 1, 1, 1, { basic: true }), 0.25, k * 0.2, 0.3)); }
+      db.add(at(cyl(0.36, 0.36, 0.03, mix(j.prop, "#ffffff", 0.45), { out: false }), 0, 0.5, 0));
+      db.position.set(0, 0.62, 0.62); g.add(db);
+    }
+    return parts;
+  }
+  const se = chibi(JOB.se, "se"), db = chibi(JOB.db, "db");
+  se.g.position.set(-1.45, 0, 1.2); se.g.rotation.y = 0.5; db.g.position.set(1.45, 0, 1.2); db.g.rotation.y = -0.5;
+  se.g.scale.setScalar(1.35); db.g.scale.setScalar(1.35);
+  scene.add(se.g, db.g);
+
+  if (style === "toon") for (const m of toOutline) { const o = new THREE.Mesh(m.geometry, outline); m.add(o); }
+
+  // light
+  if (style === "low") { scene.add(new THREE.HemisphereLight(0xffb38a, 0x3a2a5e, 0.65)); }
+  else if (style === "clay") { scene.add(new THREE.HemisphereLight(0xffffff, 0xb9a6d6, 0.75)); }
+  else scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+  const sun = new THREE.DirectionalLight(style === "low" ? 0xffc690 : 0xfff4e8, style === "low" ? 1.15 : style === "clay" ? 0.75 : 0.9);
+  sun.position.set(style === "low" ? -8 : 5, style === "low" ? 6 : 11, 8);
+  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 10, bottom: -4, near: 1, far: 40 });
+  sun.shadow.radius = style === "clay" ? 6 : 2; sun.shadow.bias = -0.0008;
+  scene.add(sun);
+  if (style === "low") { const p = new THREE.PointLight(0x5cf0ff, 0.8, 8); p.position.set(5, 3.2, 0); scene.add(p); }
+
+  const cam = new THREE.PerspectiveCamera(32, W / H, 0.1, 100);
+  cam.position.set(0, 3.2, 12); cam.lookAt(0, 2.2, 0);
+  return { scene, cam, se, db, cup, bug };
+}
+
+/* ---------- 2D vector chibi ---------- */
+// shapes in a right-facing local frame, origin at the feet
+function chibi2D(who, t) {
+  const j = JOB[who], S = [];
+  const bob = Math.sin(t * 3) * 2;
+  const E = (x, y, rx, ry, c, o = {}) => S.push({ k: "e", x, y, rx, ry, c, rot: o.rot || 0, no: o.no });
+  const R = (x, y, w, h, r, c, o = {}) => S.push({ k: "r", x, y, w, h, r, c, rot: o.rot || 0, no: o.no });
+  const P = (pts, c, o = {}) => S.push({ k: "p", pts, c, no: o.no });
+  const Ln = (x1, y1, x2, y2, w, c) => S.push({ k: "l", x1, y1, x2, y2, w, c });
+  const Ring = (x, y, r, w, c) => S.push({ k: "o", x, y, r, w, c });
+  const dark = mix(j.top, "#000000", 0.22);
+  // legs and shoes
+  R(-20, -46, 15, 36, 6, j.pants); R(5, -46, 15, 36, 6, j.pants);
+  E(-12, -9, 15, 9, j.shoe); E(16, -9, 15, 9, j.shoe);
+  // back arm
+  if (who === "se") Ln(-18, -92 + bob, -34, -66 + bob, 14, dark);
+  // body
+  R(-32, -104 + bob, 64, 64, 24, j.top);
+  R(10, -100 + bob, 18, 56, 12, dark, { no: true });
+  E(0, -104 + bob, 26, 9, dark);
+  // head
+  const hy = -150 + bob;
+  E(-4, hy - 4, 58, 50, j.hair);
+  E(0, hy + 4, 52, 46, j.skin);
+  if (who === "db") { E(-6, hy - 58, 18, 16, j.hair); P([[-44, hy + 12], [-40, hy + 42], [0, hy + 58], [40, hy + 42], [46, hy + 12], [20, hy + 30], [-20, hy + 30]], j.hair); }
+  // bangs
+  if (who === "se") P([[-56, hy - 6], [-48, hy - 48], [-20, hy - 70], [-6, hy - 50], [10, hy - 76], [22, hy - 46], [48, hy - 60], [56, hy - 4], [40, hy - 22], [24, hy - 10], [6, hy - 26], [-14, hy - 8], [-32, hy - 24]], j.hair);
+  else P([[-54, hy - 4], [-46, hy - 40], [-10, hy - 54], [30, hy - 50], [54, hy - 18], [54, hy], [30, hy - 22], [0, hy - 14], [-26, hy - 24]], j.hair);
+  // eyes
+  for (const x of [6, 32]) { E(x, hy + 8, 7.5, 12, "#241f3d", { no: true }); E(x - 2.5, hy + 3, 3, 3.5, "#ffffff", { no: true }); }
+  E(-4, hy + 24, 8, 4, "#ff9fb0", { no: true }); E(42, hy + 24, 7, 4, "#ff9fb0", { no: true });
+  if (who === "se") { Ring(6, hy + 8, 15, 3.5, "#2a2f45"); Ring(32, hy + 8, 15, 3.5, "#2a2f45"); Ln(20, hy + 8, 18, hy + 8, 3, "#2a2f45"); }
+  else R(10, hy + 28, 14, 4, 2, "#5a2d1a", { no: true });
+  // front arm and prop
+  if (who === "se") {
+    const sw = Math.sin(t * 2.4) * 0.35;
+    const hx = 30 + Math.cos(-1.1 + sw) * 46, hyy = -90 + bob + Math.sin(-1.1 + sw) * 46;
+    Ln(20, -90 + bob, hx, hyy, 15, j.top); E(hx, hyy, 9, 9, j.skin);
+    R(hx - 8, hyy - 52, 18, 72, 5, j.prop, { rot: 0.5 + sw }); R(hx - 4, hyy - 46, 10, 60, 3, "#e9ecf7", { rot: 0.5 + sw, no: true });
+  } else {
+    Ln(-14, -90 + bob, 28, -76 + bob, 15, j.top); Ln(20, -90 + bob, 34, -70 + bob, 15, dark);
+    for (let k = 0; k < 3; k++) { const y = -48 - k * 22 + bob; R(22, y - 20, 50, 24, 6, j.prop); E(47, y - 20, 25, 7, mix(j.prop, "#ffffff", 0.35)); E(62, y - 6, 3, 3, "#6dff9a", { no: true }); }
+    E(34, -72 + bob, 9, 9, j.skin);
+  }
+  return S;
+}
+function bugShapes(t) { const S = [], y = Math.sin(t * 8) * 1.5; S.push({ k: "e", x: 0, y: -16 + y, rx: 22, ry: 14, c: "#5cc95c" }, { k: "e", x: -22, y: -18 + y, rx: 10, ry: 9, c: "#2a2f45" }); for (const x of [-10, 2, 14]) S.push({ k: "l", x1: x, y1: -8, x2: x - 6, y2: 0, w: 3, c: "#2a2f45" }); return S; }
+function cupShapes() { return [{ k: "o", x: 16, y: -20, r: 9, w: 5, c: "#ffffff" }, { k: "r", x: -14, y: -40, w: 28, h: 38, r: 6, c: "#ffffff" }, { k: "r", x: -14, y: -26, w: 28, h: 12, r: 2, c: "#ff6d4d", no: true }, { k: "e", x: 0, y: -40, rx: 14, ry: 4, c: "#6b3e22" }]; }
+
+function pathOf(ctx, s) {
+  ctx.beginPath();
+  if (s.k === "e") ctx.ellipse(s.x, s.y, s.rx, s.ry, s.rot, 0, Math.PI * 2);
+  else if (s.k === "r") { ctx.save(); ctx.translate(s.x + s.w / 2, s.y + s.h / 2); ctx.rotate(s.rot); rr(ctx, -s.w / 2, -s.h / 2, s.w, s.h, Math.min(s.r, s.w / 2, s.h / 2)); ctx.restore(); }
+  else if (s.k === "p") { s.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); }
+}
+function drawShapes(ctx, S, look, ox, oy, sc, flip) {
+  ctx.save(); ctx.translate(ox, oy); ctx.scale(sc * (flip ? -1 : 1), sc);
+  const stroke = (s, w, col) => { ctx.strokeStyle = col; ctx.lineCap = "round"; ctx.lineJoin = "round"; if (s.k === "l") { ctx.lineWidth = s.w + w; ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke(); } else if (s.k === "o") { ctx.lineWidth = s.w + w; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.stroke(); } else { ctx.lineWidth = w; pathOf(ctx, s); ctx.stroke(); } };
+  const fill = (s, col) => { if (s.k === "l" || s.k === "o") stroke(s, 0, col); else { ctx.fillStyle = col; pathOf(ctx, s); ctx.fill(); } };
+  if (look === "flat") {
+    for (const s of S) { if (!s.no) stroke(s, 7, "#1d1b2e"); fill(s, s.c); }
+  } else if (look === "neon") {
+    for (const s of S) {
+      const bright = mix(s.c, "#ffffff", 0.25);
+      ctx.shadowColor = bright; ctx.shadowBlur = 16;
+      if (s.k === "l" || s.k === "o") { stroke(s, 0, bright); continue; }
+      fill(s, mix(s.c, "#0b0620", 0.72)); if (!s.no) stroke(s, 3, bright); else fill(s, bright);
+    }
+    ctx.shadowBlur = 0;
+  } else if (look === "paper") {
+    ctx.save(); ctx.shadowColor = "rgba(50,30,10,0.4)"; ctx.shadowBlur = 8; ctx.shadowOffsetX = 5; ctx.shadowOffsetY = 7;
+    for (const s of S) if (!s.no) stroke(s, 14, "#fffdf6");
+    ctx.restore();
+    for (const s of S) if (!s.no) stroke(s, 14, "#fffdf6");
+    for (const s of S) { if (!s.no || s.k === "r") { ctx.save(); ctx.shadowColor = "rgba(50,30,10,0.25)"; ctx.shadowBlur = 3; ctx.shadowOffsetY = 2; fill(s, s.c); ctx.restore(); } else fill(s, s.c); }
+  }
+  ctx.restore();
+}
+
+let grain = null;
+function paperGrain() {
+  if (grain) return grain;
+  const c = mk(256, 256), x = c.getContext("2d"), d = x.createImageData(256, 256);
+  for (let i = 0; i < d.data.length; i += 4) { const v = 128 + (Math.random() - 0.5) * 60; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 22; }
+  x.putImageData(d, 0, 0); return (grain = c);
+}
+
+function bg2D(ctx, look, t) {
+  if (look === "flat") {
+    ctx.fillStyle = "#e6e3f7"; ctx.fillRect(0, 0, W, H);
+    for (const x of [90, 330, 570, 810]) {
+      const g = ctx.createLinearGradient(0, 120, 0, 300); g.addColorStop(0, "#ff9a7a"); g.addColorStop(1, "#ffd88a");
+      ctx.fillStyle = g; rr(ctx, x - 10, 120, 180, 170, 16); ctx.fill();
+      ctx.fillStyle = "#7a6fc4"; for (let k = 0; k < 5; k++) { const h = 40 + ((x + k * 37) % 70); ctx.fillRect(x + k * 34, 290 - h, 28, h); }
+      ctx.strokeStyle = "#1d1b2e"; ctx.lineWidth = 6; rr(ctx, x - 10, 120, 180, 170, 16); ctx.stroke();
+    }
+    ctx.fillStyle = "#4b4590"; ctx.fillRect(0, 440, W, 100);
+    ctx.fillStyle = "#5a53a6"; for (let x = -40; x < W; x += 90) { ctx.beginPath(); ctx.moveTo(x, 440); ctx.lineTo(x + 50, 440); ctx.lineTo(x + 20, 540); ctx.lineTo(x - 30, 540); ctx.fill(); }
+    ctx.strokeStyle = "#1d1b2e"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(0, 440); ctx.lineTo(W, 440); ctx.stroke();
+    const desk = (x, y, w, legs) => { ctx.fillStyle = "#ffb84d"; rr(ctx, x, y, w, 20, 8); ctx.fill(); ctx.stroke(); if (legs) { ctx.fillStyle = "#1d1b2e"; ctx.fillRect(x + 18, y + 20, 8, 440 - y - 20); ctx.fillRect(x + w - 26, y + 20, 8, 440 - y - 20); } };
+    desk(40, 330, 200, true); desk(720, 330, 200, true); desk(370, 250, 220, false);
+    ctx.fillStyle = "#2e2a4a"; rr(ctx, 120, 270, 90, 58, 8); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#7dffcf"; rr(ctx, 128, 278, 74, 40, 4); ctx.fill();
+    ctx.fillStyle = "#2e2a4a"; rr(ctx, 750, 270, 90, 58, 8); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#7dffcf"; rr(ctx, 758, 278, 74, 40, 4); ctx.fill();
+  } else if (look === "neon") {
+    const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#07031a"); g.addColorStop(0.62, "#2a0b4a"); g.addColorStop(0.63, "#0b0620"); g.addColorStop(1, "#0b0620");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const sun = ctx.createLinearGradient(0, 120, 0, 330); sun.addColorStop(0, "#ffd24d"); sun.addColorStop(1, "#ff3df2");
+    ctx.fillStyle = sun; ctx.beginPath(); ctx.arc(480, 330, 150, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = "#2a0b4a"; for (let k = 0; k < 6; k++) ctx.fillRect(320, 250 + k * 14, 320, 3 + k);
+    ctx.fillStyle = "#0b0620"; for (let k = 0; k < 18; k++) { const h = 50 + ((k * 53) % 120), x = k * 56 - 10; ctx.fillRect(x, 338 - h, 50, h); }
+    ctx.fillStyle = "#3df7ff"; for (let k = 0; k < 60; k++) ctx.fillRect((k * 97) % W, 230 + ((k * 31) % 100), 4, 4);
+    ctx.save(); ctx.shadowColor = "#ff3df2"; ctx.shadowBlur = 10; ctx.strokeStyle = "#ff3df2"; ctx.lineWidth = 2;
+    for (let k = 0; k <= 16; k++) { ctx.beginPath(); ctx.moveTo(480, 338); ctx.lineTo(-400 + k * 110, H); ctx.stroke(); }
+    const off = (t * 40) % 1;
+    for (let k = 0; k < 8; k++) { const z = (k + off) / 8, y = 338 + z * z * 210; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.strokeStyle = "#3df7ff"; ctx.shadowColor = "#3df7ff"; ctx.lineWidth = 3;
+    for (const [x, y, w] of [[40, 330, 200], [720, 330, 200], [370, 250, 220]]) { ctx.strokeRect(x, y, w, 14); }
+    ctx.restore();
+  } else if (look === "paper") {
+    ctx.fillStyle = "#cfe5ea"; ctx.fillRect(0, 0, W, H);
+    const layer = (col, seed, base, amp, sh) => {
+      ctx.save(); ctx.shadowColor = "rgba(40,30,20,0.35)"; ctx.shadowBlur = sh; ctx.shadowOffsetY = 4;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, H);
+      for (let x = 0; x <= W; x += 48) { const h = base - (((x + seed) * 37) % amp); ctx.lineTo(x, h); ctx.lineTo(x + 40, h); }
+      ctx.lineTo(W, H); ctx.fill(); ctx.restore();
+    };
+    ctx.fillStyle = "#ffe9a8"; ctx.beginPath(); ctx.arc(780, 110, 50, 0, 7); ctx.fill();
+    layer("#a9cbd4", 11, 300, 140, 6); layer("#7fa9b8", 29, 340, 120, 8); layer("#4f7d93", 53, 390, 90, 10);
+    ctx.save(); ctx.shadowColor = "rgba(40,30,20,0.4)"; ctx.shadowBlur = 10; ctx.shadowOffsetY = -3;
+    ctx.fillStyle = "#c99a6b"; ctx.beginPath(); ctx.moveTo(0, 446); for (let x = 0; x <= W; x += 60) ctx.lineTo(x, 440 + ((x * 13) % 9)); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill(); ctx.restore();
+    const desk = (x, y, w, legs) => { ctx.save(); ctx.shadowColor = "rgba(40,30,20,0.4)"; ctx.shadowBlur = 7; ctx.shadowOffsetY = 5; ctx.fillStyle = "#e5533d"; ctx.fillRect(x, y, w, 20); if (legs) { ctx.fillStyle = "#8a5a3a"; ctx.fillRect(x + 16, y + 20, 12, 440 - y - 20); ctx.fillRect(x + w - 28, y + 20, 12, 440 - y - 20); } ctx.restore(); };
+    desk(40, 330, 200, true); desk(720, 330, 200, true); desk(370, 250, 220, false);
+  }
+}
+
+function render2D(ctx, look, t) {
+  bg2D(ctx, look, t);
+  const sh = (x) => { if (look === "neon") return; ctx.fillStyle = look === "paper" ? "rgba(50,30,10,0.25)" : "rgba(29,27,46,0.25)"; ctx.beginPath(); ctx.ellipse(x, 446, 46, 9, 0, 0, 7); ctx.fill(); };
+  sh(355); sh(605); sh(790);
+  drawShapes(ctx, cupShapes(), look, 480, 250 - Math.abs(Math.sin(t * 2)) * 8, 1.1, false);
+  drawShapes(ctx, bugShapes(t), look, 790, 444, 1.4, true);
+  drawShapes(ctx, chibi2D("se", t), look, 355, 444, 1.3, false);
+  drawShapes(ctx, chibi2D("db", t + 1), look, 605, 444, 1.3, true);
+  if (look === "paper") { ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.fillStyle = ctx.createPattern(paperGrain(), "repeat"); ctx.fillRect(0, 0, W, H); ctx.restore(); }
+  hud(ctx, look);
+}
+
+/* ---------- page ---------- */
+const STYLES3 = [
+  ["clay", "Soft Clay 3D", "high", "Rounded, toy-like figures under soft light with gentle shadows, like modern 3D app icons. Friendly and very readable. Each job needs a simple 3D model.", "three.js, one low-detail model per job", "Mascot-style, cosy office"],
+  ["toon", "Anime Cel 3D", "high", "3D models drawn like anime: hard 3-step shading, ink outlines, bold comic HUD. Closest to the chibi/anime brief, and it reads clearly at speed.", "three.js toon shader + outline pass", "Main look, anime feel"],
+  ["low", "Low-Poly Dusk", "mid", "Faceted shapes with warm sunset light and a cool screen glow. The cheapest 3D to model, and the facets hide the lack of detail.", "three.js flat shading, very light models", "Moody, stylised"],
+];
+const STYLES2 = [
+  ["flat", "Flat Vector Cartoon", "mid", "Bold outlines and flat colour, the look of many modern mobile and indie fighters. Parts are drawn once and animated with bones, so new moves are cheap.", "Vector parts + skeletal rig (Spine-style)", "Main look, broad appeal"],
+  ["neon", "Neon Vector", "mid", "Glowing outlines on a dark synthwave grid. Striking for night arenas like the 3 AM War Room or Hackathon. Busy effects can hurt readability.", "Same vector rig + glow layer", "Night arenas or a seasonal theme"],
+  ["paper", "Paper Cutout", "mid", "Layered cut paper with soft drop shadows and grain. Warm and handmade, and it animates like a puppet theatre.", "Same vector rig + paper textures", "Distinctive indie look"],
+];
+const frames = [];
+function card(host, [key, name, cost, text, tech, fit], i, is3D) {
+  const fig = document.createElement("figure");
+  const shot = document.createElement("div"); shot.className = "shot";
+  const c = mk(W, H); c.setAttribute("role", "img"); c.setAttribute("aria-label", name + " sample"); shot.append(c);
+  const n = document.createElement("span"); n.className = "n"; n.textContent = String(i); shot.append(n);
+  const cap = document.createElement("figcaption");
+  cap.innerHTML = `<div class="row"><h2>${name}</h2><span class="cost ${cost}">${cost === "mid" ? "MEDIUM" : cost.toUpperCase()} COST</span></div><p>${text}</p><div class="meta"><span><b>Built with</b> ${tech}</span><span><b>Fits as</b> ${fit}</span></div>`;
+  fig.append(shot, cap); host.append(fig);
+  frames.push({ key, is3D, ctx: c.getContext("2d"), canvas: c, visible: true });
+}
+STYLES3.forEach((s, i) => card(document.getElementById("g3"), s, i + 1, true));
+STYLES2.forEach((s, i) => card(document.getElementById("g2"), s, i + 4, false));
+
+if (has3D) {
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    for (const f of frames) if (f.is3D) f.s3 = build3D(f.key);
+  } catch (e) { renderer = null; }
+}
+const io = "IntersectionObserver" in window ? new IntersectionObserver((es) => es.forEach((e) => { const f = frames.find((q) => q.canvas === e.target); if (f) f.visible = e.isIntersecting; })) : null;
+frames.forEach((f) => io && io.observe(f.canvas));
+
+function draw(t, all) {
+  for (const f of frames) {
+    if (!all && !f.visible) continue;
+    if (f.is3D) {
+      if (!renderer || !f.s3) { f.ctx.fillStyle = "#222"; f.ctx.fillRect(0, 0, W, H); f.ctx.fillStyle = "#ccc"; f.ctx.font = "20px Inter, sans-serif"; f.ctx.textAlign = "center"; f.ctx.fillText("3D preview needs WebGL", W / 2, H / 2); continue; }
+      const s = f.s3;
+      s.se.g.position.y = Math.abs(Math.sin(t * 3)) * 0.06; s.db.g.position.y = Math.abs(Math.sin(t * 3 + 1)) * 0.06;
+      s.se.armR.rotation.set(-0.35, 0, -2.2 + Math.sin(t * 2.4) * 0.45);
+      s.se.head.rotation.z = Math.sin(t * 1.5) * 0.05; s.db.head.rotation.z = Math.sin(t * 1.5 + 2) * 0.05;
+      s.cup.rotation.y = t * 1.2; s.cup.position.y = 3.85 + Math.sin(t * 2) * 0.08;
+      s.bug.position.x = 3.6 + Math.sin(t * 0.8) * 0.5; s.bug.rotation.y = Math.cos(t * 0.8) > 0 ? 0 : Math.PI;
+      renderer.render(s.scene, s.cam);
+      f.ctx.drawImage(renderer.domElement, 0, 0);
+      hud(f.ctx, f.key);
+    } else render2D(f.ctx, f.key, t);
+  }
+}
+const start = () => {
+  draw(0.6, true);
+  if (reduce) return;
+  let last = 0;
+  const loop = (now) => { if (now - last > 33) { last = now; draw(now / 1000, false); } requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+};
+(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(start);
+})();
+</script>

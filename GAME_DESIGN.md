@@ -1,482 +1,300 @@
-# TECHKEN — Game Design Doc (v0.2, tuned)
+# TECHKEN — Game Design Doc (v0.3, top-down)
 
-> A 2D 8-bit 1v1 fighting game where every fighter is a tech job.
-> All numbers are **first-pass values** to give the system a shape. Tune them in playtests.
+> A 1v1 **top-down arena fighter** where every fighter is a tech job.
+> Look: mobile stylized 3D (see `design/art/reference-archero2.md`).
+> **v0.3 changes:** top-down arenas, one kit per job (1 passive + 3 skills), no jumping or guard, short plain descriptions.
+> The v0.2 side-view kits are archived in `design/archive/kits-v0.2-sideview.md`.
+> Still written for side-view, to update during the rebuild: parts of 6 (Career and Training details), 12 (screens) and 14 (art).
+> All numbers are first-pass values. Kit numbers live in `design/kits_v3.py`.
 
 ---
 
-## 1. Core Rules (gaps filled in)
+## 1. Core Rules
+
+### 1.0 Clarity first
+- A player should understand any skill from its **icon, name and one short line**.
+- Skill lines stay under 12 words and only use the effect words in section 3.0.
+- In a match, effects show as **icons over the head**, not text.
+- The only numbers on screen: damage, cooldown seconds and Motivation cost.
+- New players learn by playing. The tutorial is 3 steps (move, charge an attack, use a skill) with no reading screens.
 
 ### 1.1 Match structure
 | Rule | Value |
 |---|---|
-| Format | 1v1, best of 3 rounds (first to 2) |
-| Platform / stack | **Browser game** built with **TypeScript + Phaser 3**, deployed on **Vercel**. Runs in desktop and mobile browsers (Chrome, Safari, Firefox, Edge) with nothing to install. Optionally installable as a PWA |
-| Perspective | Side view, platform-lite, single screen (see 1.6) |
-| Modes at launch | Vs CPU (5 difficulty levels) and Online PvP through lobby codes (see section 6) |
+| Format | 1v1, best of 3 rounds |
+| View | Top-down, closed arena, the whole arena on one screen |
+| Platform | Browser game (desktop and mobile), TypeScript, deployed on Vercel |
+| Modes | Vs CPU (5 levels), Online PvP with lobby codes, Roguelite ladder (solo, later) |
 | Round timer | 90 s |
-| HP | 1000 for every job. No item or passive raises max HP, so the "equal HP" rule always holds |
-| KO | HP hits 0 → the other player scores 1 point |
-| Time out | Higher **HP %** wins the round |
-| Exact HP tie at time out | **Overtime** (15 s): items stop spawning, the arena walls slowly close in ("Scope Creep"), the first clean hit wins |
-| Double KO | Both players score. If that makes it 2–2, play a **Production Incident** tiebreaker: 50 % HP, 45 s, no items |
-| Between rounds | HP, Motivation, cooldowns and all buffs reset. Fighters return to their start positions |
-| Comeback (optional) | The player who lost the last round starts the next one with a random Common item ("Pity Coffee") |
+| HP | 1000 for every job. Nothing raises max HP |
+| Time out | Higher HP % wins the round |
+| Exact tie | **Overtime** 15 s: the arena shrinks, first clean hit wins |
+| Double KO | Both score. At 2-2, play one final round at 50% HP |
+| Between rounds | HP, Motivation, cooldowns and buffs reset |
+| Comeback | The loser of a round starts the next with a free Coffee |
 
-### 1.2 Basic attacks (charge system)
-Basic attacks are **hold to charge, release to swing**. Spamming is weak by design.
-
-| Tier | How | Effect |
+### 1.2 Basic attack: hold to charge
+| | How | Effect |
 |---|---|---|
-| Tap | Release before 25 % charge | Low damage, short flinch, **0.5 s recovery** |
-| Mid | 25–99 % charge | Scales up linearly |
-| Full | Reach 100 % (sprite flashes, sound cue) | Max damage, knockback, **breaks guard**, only **0.3 s recovery** |
+| Tap | Release early | About a third of full damage. Recovery 0.4 s plus a third of the charge time, so heavy weapons tap slowly |
+| Full | Hold until the ring fills | Full damage, knockback, only 0.3 s recovery |
 
-- Every job has its own charge time, from 0.5 s to 1.3 s (see the roster table).
-- While charging you move at 60 % speed.
-- Getting hit while charging **cancels the charge**, unless the job has super armor (DBA).
-- You can hold a full charge for up to 1.5 s, then it fires on its own.
-- Full charge rewards you with a faster follow-up than tapping does. That is the anti-spam rule.
+- Each job has its own charge time (0.5–1.3 s) and damage (section 2).
+- You move at 60% speed while charging.
+- **Taps can't stop a charge.** Mid and full hits cancel it (not for Database Admin, whose charge can't be stopped at all). This keeps tap-spamming weak.
+- **Aim:** basics aim at the opponent when they're roughly in front of you, otherwise straight ahead. Melee hits an arc in front. Ranged fires a shot.
 
 ### 1.3 Motivation and Burnout
 | Rule | Value |
 |---|---|
-| Max Motivation | 100, full at round start |
-| Regen | +6/s, starting 1 s after you last spent any |
-| On landing a basic hit | +4 |
-| On taking a hit | +2 (a small comeback trickle) |
-| Spent by | Skills (15–45), Dash (10), Guard (5 per blocked hit) |
-| **Burnout trigger** | Motivation reaches exactly 0 |
-| **Burnout effect** | 2.0 s: move speed −50 %, **can't attack, cast or dash**. You can still jump and guard, but guard only blocks 40 % |
-| Burnout recovery | You come back with 35 Motivation |
-| **Crunch Cast** | You *can* cast a skill you can't afford. It fires, and you burn out right away. This is a deliberate all-in move for the last hit |
-| Visual | Sprite goes grayscale, sweat drop, "zzz" over the head, a sad "Monday" jingle |
+| Max | 100, full at round start |
+| Regen | +6/s, starting 1 s after you spend |
+| Gain | +4 when you land a basic, +2 when you get hit |
+| Costs | Skills 20 / 30 / 40, Dash 10 |
+| **Burnout** | At 0 Motivation: 2 s of 50% speed, no attacks, skills or dashes. You come back with 35 |
+| **Crunch Cast** | You can cast a skill you can't afford. It fires, then you burn out |
 
-Guard and dash also cost Motivation, so a defensive player can burn out too. Pressure creates burnout, and burnout creates openings.
-
-### 1.4 Defense and movement (shared by all jobs)
-- **Move / Jump / Double jump** (DBA and System Analyst: single jump; Cloud Engineer: triple jump).
-- **Drop through platforms** with down.
-- **Guard** (hold): blocks 70 % of damage, costs 5 Motivation per blocked hit, and you can't move. A full-charge basic breaks guard (0.6 s stagger).
-- **Dash**: 0.2 s of invincibility frames, costs 10 Motivation, 1.2 s cooldown.
-- **Wall Splat**: the arena is closed, so a full-charge hit into a wall bounces the target off it for a short combo window. This rewards corner pressure.
-- **Hitstun**: tap 0.2 s, mid 0.35 s, full = knockback plus 0.5 s.
+### 1.4 Moving and defending
+- Move in any direction.
+- **Dash:** a short burst, 0.2 s invulnerable, 10 Motivation, 1.2 s cooldown. This is your main defense.
+- **No jump and no guard.** You dodge with dash and hide behind cover.
+- **Cover:** desks and crates block movement and shots. Some can break.
+- **Wall Splat:** a full-charge hit that knocks someone into a wall stuns them for 0.4 s.
 
 ### 1.5 Skills
-- Each job has **1 passive and 2–3 actives**. Keep the cap at 3 actives: mobile has room for about 3 skill buttons.
-- **No ultimates / super moves.** Big moments come from combos, Crunch Casts and Burnout punishes.
-- Every skill has a **Motivation cost and a cooldown**.
-- **Balance rule:** a job with 3 actives has lower numbers per skill than a job with 2.
-- Targeted skills (Cloud Engineer and others) use **smart cast**: a tap targets the opponent's position, and holding the button lets you aim (see Controls).
+- **One kit per job: 1 passive + 3 skills.** No set picking.
+- Slot pattern, so every kit reads the same way:
+  - **S1** quick and cheap: 20 Motivation, about 6 s cooldown.
+  - **S2** control or utility: 30 Motivation, about 12 s cooldown.
+  - **S3** big play: 40 Motivation, about 18 s cooldown.
+- **Aiming:** tap a skill to auto-aim at the opponent. Hold or drag it to aim yourself.
+- No ultimates. Big moments come from combos, Crunch Casts and Burnout punishes.
 
-### 1.6 Perspective: platform-lite, single screen
-- **Side view. The whole arena fits on one screen, so the camera never scrolls.** Both players always see everything, which fits the 8-bit look and keeps online play fair.
-- **Layout:** walls on the left and right, a ceiling, the main floor, and 2–4 **one-way platforms** (jump up through them, press down to drop through).
-- **Base resolution 384×216 (16:9)**, scaled up by whole numbers so pixels stay crisp: ×3 = 1152×648, ×5 = 1920×1080, ×10 = 4K. Tiles are 16×16. *(Raised from 320×180 to fit the detailed art style in section 14 with room for platforms.)*
-  - Browser windows come in any size, so the canvas uses the largest whole-number scale that fits and fills the rest with black bars (CSS `image-rendering: pixelated`).
-- **Fighter size:** a 48×48 frame with a **chibi** body about 40 px tall (about 2.5 heads). DBA is bigger (about 44 px tall) and UI/UX is smaller (about 36 px tall), so the hitbox size matches the job's weight. See 14.3.
-
----
-
-## 2. Roster Overview
-
-| # | Job | Archetype | Weapon | Range | Full charge | Tap / Full dmg | Speed | Weight | Difficulty |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | Software Engineer | All-rounder / combo | Mechanical keyboard (two-handed club) | Mid melee | 0.8 s | 25 / 70 | ●●● | ●●● | ★★ |
-| 2 | Mobile Developer | Hit-and-run | Phone on a selfie stick (flail) | Mid | 0.6 s | 20 / 60 | ●●●● | ●● | ★★ |
-| 3 | QA Analyst | Debuffer / hunter | Bug net | Mid melee, wide arc | 0.7 s | 20 / 65 | ●●● | ●●● | ★★ |
-| 4 | System Analyst | Area control | Telescopic presentation pointer (spear) | Long melee poke | 1.0 s | 25 / 80 | ●●● | ●●● | ★★★ |
-| 5 | Network Admin | Zoner | Router that fires signal waves | Long ranged, damage falls to 70 % at max range | 1.0 s | 20 / 70 | ●● | ●● | ★★★ |
-| 6 | Database Admin | Grappler / tank | **A literal table** | Short, wide | 1.3 s (super armor) | 35 / 110 | ● | ●●●●● | ★★ |
-| 7 | DevOps Engineer | Builder | Pipe wrench | Mid | 0.9 s | 25 / 75 | ●●● | ●●●● | ★★★ |
-| 8 | Cloud Engineer | Artillery | Umbrella (glide) | Short melee | 0.9 s | 20 / 60 | ●●● | ● (floaty) | ★★★ |
-| 9 | Technical Support | Summoner / pressure | Stack of tickets (thrown) | Short-mid projectile | 0.8 s | 20 / 65 | ●●● | ●●● | ★★ |
-| 10 | Cybersecurity Analyst | Defensive / counter | Riot "firewall" shield and baton | Short | 0.9 s | 25 / 70 | ●● | ●●●● | ★★★ |
-| 11 | Data Scientist | Ranged / probability | Graph notebook that fires scatter-plot dots | Mid spread shot | 0.8 s | 3×8 / 3×20 | ●●● | ●● | ★★★ |
-| 12 | AI/ML Engineer | Summoner (autonomous) | Holo-tablet (weak zap) | Mid | 1.0 s | 15 / 60 | ●●● | ●● | ★★★★ |
-| 13 | Business Analyst | Attrition / poison | Requirements binder and sticky notes | Short melee | 0.8 s | 20 / 60 | ●●● | ●●● | ★★ |
-| 14 | Project Manager | Controller / tempo | Alarm clock on a chain (flail) | Long melee | 1.0 s | 25 / 75 | ●●● | ●●● | ★★★★ |
-| 15 | UI/UX Designer | Rushdown | Stylus rapier | Mid poke, sweet spot at the tip | 0.5 s | 15 / 50 | ●●●●● | ● | ★★★ |
-| 16 | Technical Writer | Zoner / trapper | Fountain pen (ink arcs) | Mid arcing projectile | 0.8 s | 20 / 65 | ●●● | ●● | ★★★ |
-| 17 | Vibe Coder | Glass cannon / burst | Stickered laptop that fires prompt bubbles | Mid projectile | 0.6 s | 20 / 60 | ●●●● | ●● | ★★ |
-
-**Matchup wheel (rough):**
-Rushdown → beats Zoners → beat Grapplers/Tanks → beat Rushdown.
-Summoners lose to AoE (DBA's DROP TABLE, Data Scientist's Remove Outliers, Network Admin's Broadcast Storm) and beat slow tanks.
+### 1.6 Camera and arena size
+- Camera looks down at about 55°. The whole arena fits on screen and the camera never scrolls.
+- Arenas are about **15 × 9 tiles** (landscape) with walls all around, 2–4 pieces of cover and one hazard.
+- Rendering is 3D (three.js). The simulation underneath is 2D on the floor plane, deterministic and integer-only, so rollback netcode keeps working.
+- Fighters are about 1 tile wide.
 
 ---
 
-## 3. Jobs, with two skill sets each
+## 2. Roster
 
-Format: `Skill (Motivation cost / cooldown)`. They are complete kits, not parts to mix.
+| # | Job | Role | Basic attack | Speed |
+|---|---|---|---|---|
+| 1 | Software Engineer | All-rounder | Melee, 22 / 70 dmg, 0.8 s charge | ●●● |
+| 2 | Mobile Developer | Hit-and-run | Melee, 16 / 50 dmg, 0.6 s charge | ●●●● |
+| 3 | QA Analyst | Debuffer | Melee, 19 / 58 dmg, 0.7 s charge | ●●● |
+| 4 | System Analyst | Area control | Melee, 26 / 80 dmg, 1.0 s charge | ●●● |
+| 5 | Network Admin | Zoner | Ranged, 22 / 70 dmg, 1.0 s charge | ●● |
+| 6 | Database Admin | Tank | Melee, 35 / 110 dmg, 1.3 s charge | ● |
+| 7 | DevOps Engineer | Builder | Melee, 24 / 75 dmg, 0.9 s charge | ●●● |
+| 8 | Cloud Engineer | Artillery | Melee, 23 / 72 dmg, 0.9 s charge | ●●● |
+| 9 | Technical Support | Summoner | Ranged, 16 / 50 dmg, 0.8 s charge | ●●● |
+| 10 | Cybersecurity Analyst | Defender | Melee, 22 / 68 dmg, 0.9 s charge | ●● |
+| 11 | Data Scientist | Ranged | Ranged, 18 / 60 dmg, 0.8 s charge | ●●● |
+| 12 | AI/ML Engineer | Summoner | Ranged, 17 / 52 dmg, 1.0 s charge | ●●● |
+| 13 | Business Analyst | Damage over time | Melee, 19 / 60 dmg, 0.8 s charge | ●●● |
+| 14 | Project Manager | Controller | Melee, 24 / 75 dmg, 1.0 s charge | ●●● |
+| 15 | UI/UX Designer | Rushdown | Melee, 13 / 42 dmg, 0.5 s charge | ●●●●● |
+| 16 | Technical Writer | Trapper | Ranged, 18 / 55 dmg, 0.8 s charge | ●●● |
+| 17 | Vibe Coder | Burst | Ranged, 15 / 46 dmg, 0.6 s charge | ●●●● |
 
-**About each job's "Art" line:** every fighter shares one rendering style (section 14), so they look like they belong in the same game. A job's "Art" line describes its **color family and its skill-effect style**. For example, the Software Engineer's effects use a Game Boy green tone ramp, and the Technical Writer's effects are 1-bit ink.
-
-**Set selection:**
-- Players pick **job, then Set A or B, every match** at character select.
-- Picks are **blind**: both are revealed together when both players press Ready, so nobody can counter-pick after seeing the other's choice.
-- **Between rounds, the player who lost the round may switch set** (not job). That's a small adaptation tool for the loser.
-- **Real product names stay** (Jira, Kubernetes, Stack Overflow, Figma and so on).
-
----
-
-### 1. Software Engineer: "Syntax"
-- **Art:** Game Boy 4-shade green palette. Skill effects use syntax-highlighting colors (purple keywords, orange strings).
-- **Weapon:** Mechanical keyboard swung like a club. Keycaps fly off on full charge.
-- **Quirk:** *Syntax chain*. Tap → Tap → Full flows as one chain with no recovery between hits.
-
-**Set A: "Strongly Typed"** (combo builder)
-- **Passive, Compiler:** Land 3 hits within 2 s and your next skill "compiles" for +25 % damage. Taking a hit resets it ("Build Failed").
-- **`;` Semicolon Strike (20 / 6 s):** A short dash that ends the opponent's current action (interrupts a charge or cast). 45 dmg.
-- **`{ }` Brace Cage (30 / 12 s):** Two curly braces slam shut around a zone in front of you. Traps the target for 1.0 s.
-- **Recursion (35 / 14 s):** A function projectile that bounces back and forth through the target, up to 3 calls at 30 dmg each.
-- **Combo:** Syntax chain fills Compiler → Brace Cage → compiled Recursion hits the caged target 3 times.
-
-**Set B: "Exception Handling"** (patient counter-puncher)
-- **Passive, Try/Catch:** After 4 s without taking damage, the next hit on you is "caught": −35 % damage and +10 Motivation.
-- **throw Error (20 / 6 s):** A projectile that marks the target "Unhandled" for 4 s. Your next hit on a marked target does +30.
-- **finally { } (30 / 16 s):** A 0.8 s counter stance. If you're hit during it, you auto-counter for 80 dmg.
-- **Hotfix (25 / 18 s):** Heal 60 HP over 2 s.
-- **Combo:** Throw a mark → they rush in to retaliate → `finally` counters → the mark pops. Try/Catch rewards playing patiently.
+**Matchup wheel (rough):** rushdown beats zoners, zoners beat tanks, tanks beat rushdown. Summoners lose to area attacks (DROP TABLE, Remove Outliers, Broadcast Storm).
 
 ---
 
-### 2. Mobile Developer: "Everything's on the phone"
-- **Art:** Glossy app-icon gradients, rounded pixels, red notification badges everywhere.
-- **Weapon:** A phone on a selfie stick, swung like a flail. Full charge fires a camera-flash cone.
-- **Quirk:** 2 dash charges (fastest repositioning in the game).
+## 3. Jobs and kits
 
-**Set A: "Push Notifications"** (stack and cash out)
-- **Passive, Notification Badge:** Every hit adds a red badge to the opponent (max 5).
-- **Swipe (20 / 7 s):** A swipe dash through the opponent. 35 dmg and +1 badge.
-- **Camera Flash (25 / 12 s):** A cone that "blinds": the opponent's charge speed is −50 % for 3 s.
-- **Push Notification (25 / 8 s):** Buzzes all their badges. 20 dmg per badge plus a 0.1 s vibrate-stun per badge.
-- **Combo:** Fast basics and Swipe stack 5 badges → Flash stops their retaliation → Push for 100+.
+One kit per job: **1 passive and 3 skills** (S1 / S2 / S3). Format: `Cost / Cooldown`.
 
-**Set B: "Cross-Platform Release"** (stance switcher)
-- **Passive, Cross-Platform:** Each skill you cast swaps your stance. **iOS:** +15 % damage. **Android:** +15 % speed. The palette changes to match.
-- **Deploy to Device (30 / 12 s):** Throw your phone as a turret (80 HP, 6 s) that fires a 12-dmg tap at the opponent every second.
-- **Hot Reload (25 / 16 s):** Teleport to where you were 3 s ago and recover 50 % of the HP you lost in those 3 s.
-- **Combo:** Drop the turret (stance swap) → fight near it → Hot Reload undoes a bad trade (swap back).
+### 3.0 Effect words
+Every skill uses only these words. Each has one icon in the game.
 
----
+| Word | Meaning |
+|---|---|
+| **Stun** | Can't move or act. Max 1.5 s, then 1 s immune to Stun and Root |
+| **Root** | Can't move, can still attack |
+| **Slow** | Moves slower. Max 40%, the strongest slow wins |
+| **Silence** | Can't use skills. Max 2 s |
+| **Weak** | Takes +20% damage |
+| **Shield** | Absorbs damage before HP |
+| **Knockback** | Pushed away. Into a wall = Wall Splat |
+| **Crit** | x1.5 damage |
+| **Pet** | A summon with its own HP and timer. Area attacks break it |
+| **Wall / Zone** | A placed object or floor area with a timer |
 
-### 3. QA Analyst: "Finds your weaknesses"
-- **Art:** White lab coat, bug-green and warning-yellow palette, magnifying-glass glint, CRT scanlines on effects.
-- **Weapon:** Bug net with a wide arc. Full charge can "net" a summon and destroy it.
-- **Quirk:** Can always see the opponent's skill cooldowns on the HUD.
+Two job markers also show as icons: **Debt** (Business Analyst) and **Wet** (Cloud Engineer).
 
-**Set A: "Exploratory Testing"** (expose and punish)
-- **Passive, Found a Bug:** Every 4th hit on the opponent exposes a **Weak Spot** for 5 s: they take +20 % damage.
-- **Magnify (20 / 8 s):** A scanning beam. Applies Weak Spot right away.
-- **Release the Bug (30 / 15 s):** Summon a pixel bug (60 HP) that chases, bites for 15/s and slows 20 %.
-- **Reopen Ticket (35 / 18 s):** Puts the opponent's last-used skill back on its full cooldown.
-- **Combo:** Magnify → Weak Spot → the bug and a charged net hit for +20 %. Reopen Ticket shuts down their escape skill.
+### 1. Software Engineer · All-rounder
+Basic: melee, charge 0.8 s, 22 / 70 dmg · Speed ●●●
 
-**Set B: "Bug Bounty"** (burnout hunter)
-- **Passive, Edge Case:** +25 % damage against opponents who are airborne, against a wall, or in Burnout.
-- **Bug Net (20 / 9 s):** Throw a net for 30 dmg. A catch roots for 1 s.
-- **Infestation (35 / 18 s):** Plant 3 bug eggs on the floor as traps. Stepping on one hatches a bug that clings and drains 5 Motivation/s for 3 s.
-- **Combo:** Eggs and the cling drain push them toward Burnout → Net them → Edge Case damage during Burnout.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Compiler** | | Every 3rd hit: next skill +25% damage. |
+| S1 | **Semicolon Strike** | 20 / 6 s | Dash forward. 50 dmg. Interrupts. |
+| S2 | **Brace Cage** | 30 / 12 s | Braces snap shut on a spot. Stun 1.2 s. |
+| S3 | **Recursion** | 40 / 16 s | Shot that bounces off walls. Hits 3 times, 35 each. |
 
----
+### 2. Mobile Developer · Hit-and-run
+Basic: melee, charge 0.6 s, 16 / 50 dmg · Speed ●●●●
 
-### 4. System Analyst: "Designs the battlefield" *(brainstormed)*
-Theme: flowcharts, UML, swimlanes, requirements, as-is/to-be.
-- **Art:** Blueprint style. A blue-tinted sprite with white outlines and dotted-line effects.
-- **Weapon:** Telescopic presentation pointer, used like a spear for long pokes.
-- **Quirk:** Single jump only. Full charge pierces 50 % of guard.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Two Bars** | | 2 dash charges. |
+| S1 | **Swipe** | 20 / 6 s | Dash through them. 45 dmg. |
+| S2 | **Camera Flash** | 30 / 12 s | Flash cone. 45 dmg, slow 30% for 2 s. |
+| S3 | **Deploy to Device** | 40 / 18 s | Phone turret, 6 s. Shoots 15 dmg/s. |
 
-**Set A: "Flowchart"** (node network)
-- **Passive, Decision Node:** Every skill you cast leaves a ◇ node where you stand (max 3). Nodes connect with lines. An opponent who crosses a line takes 20 dmg and a short slow.
-- **Arrow Connector (20 / 6 s):** Zip along an arrow to any node, hitting everything on the path for 55.
-- **Swimlane (30 / 14 s):** A vertical lane wall for 5 s. Blocks movement and projectiles, and stuns anyone it pops up on for 0.3 s.
-- **Combo:** Build a triangle of nodes → Swimlane cuts off the exit → zip node to node through them.
+### 3. QA Analyst · Debuffer
+Basic: melee, charge 0.7 s, 19 / 58 dmg · Speed ●●●
 
-**Set B: "Requirements Gathering"** (adapts to the opponent)
-- **Passive, Stakeholder Interview:** Each *different* skill the opponent hits you with gives 1 Insight (max 3). Each Insight is +8 % damage for the round.
-- **Change Request (20 / 12 s):** Swap positions with the opponent.
-- **UML Box (30 / 15 s):** Draws a class box around the opponent. If they don't get out within 1 s, they're "Encapsulated" (stunned 1 s).
-- **Gap Analysis (25 / 10 s):** Measures the gap between you. If they retreat and widen it within 4 s, they take 70.
-- **Combo:** Change Request puts them in the corner → UML Box → Gap Analysis punishes the escape.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Found a Bug** | | Every 4th hit: Weak for 4 s. |
+| S1 | **Magnify** | 20 / 7 s | Beam. 40 dmg and Weak for 4 s. |
+| S2 | **Bug Net** | 30 / 12 s | Thrown net. 30 dmg, Root 1 s. |
+| S3 | **Release the Bug** | 40 / 18 s | Bug pet, 8 s. Chases, bites, slows. |
 
----
+### 4. System Analyst · Area control
+Basic: melee, charge 1.0 s, 26 / 80 dmg · Speed ●●●
 
-### 5. Network Admin: "Signals"
-- **Art:** Black background with neon-green phosphor, scanlines, and signal bars over the head.
-- **Weapon:** A router whose antennas fire signal waves. Damage drops with distance (1–4 bars).
-- **Quirk:** The slowest walker, with the best long range.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Critical Path** | | +25% damage to stunned or rooted targets. |
+| S1 | **Arrow Connector** | 20 / 6 s | Blink to a spot. 40 dmg on the way. |
+| S2 | **Swimlane** | 30 / 12 s | Wall for 5 s. Blocks moves and shots. |
+| S3 | **UML Box** | 40 / 18 s | Box drops on a spot. 40 dmg, stun 1.5 s. |
 
-**Set A: "Full Bars"** (fight near your router)
-- **Passive, Access Point:** Place a router at round start. Within its radius you have full bars: +20 % damage and +50 % Motivation regen.
-- **Ping (15 / 4 s):** A fast pulse for 20 dmg. On hit it also adds "lag": their next action comes out 0.2 s late.
-- **Packet Loss (30 / 14 s):** A field for 5 s. Projectiles passing through are destroyed, and the opponent's attacks inside do −30 %.
-- **Relocate AP (20 / 10 s):** Teleport the router to your position.
-- **Combo:** Hold ground near the AP → Pings add lag → Packet Loss shuts down their zoning. Relocate when they push you out.
+### 5. Network Admin · Zoner
+Basic: ranged, charge 1.0 s, 22 / 70 dmg · Speed ●●
 
-**Set B: "Traffic Control"** (lockdown)
-- **Passive, Bandwidth:** Every hit fills a bandwidth meter. When it's full, your next skill is "Broadcast": bigger area, +30 % damage.
-- **Throttle (30 / 15 s):** Tether to the opponent for 4 s. They are −35 % speed and you are +15 %. Breaking the range snaps the tether for 60 dmg.
-- **Signal Jam (20 / 12 s):** A wave that silences skills for 2 s.
-- **Broadcast Storm (40 / 20 s):** Three screen-wide pulse waves, 45 dmg each. Jump to avoid them.
-- **Combo:** Throttle → Jam (they can't skill out) → Broadcast Storm while they're slowed.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Access Point** | | Router at start. +20% damage near it. |
+| S1 | **Ping** | 20 / 5 s | Fast shot. 35 dmg, slow 20% for 1.5 s. |
+| S2 | **Packet Loss** | 30 / 14 s | Zone, 5 s. Deletes enemy shots. Enemies deal -30%. |
+| S3 | **Broadcast Storm** | 40 / 18 s | 3 rings burst out from you. 45 each. |
 
----
+### 6. Database Admin · Tank
+Basic: melee, charge 1.3 s, 35 / 110 dmg · Speed ●
 
-### 6. Database Admin: "The Heavy" *(brainstormed)*
-Theme: tables, queries, locks, JOIN, ROLLBACK, DROP TABLE, backups.
-- **Art:** Chunky, the biggest sprite. Brown and tan palette, with spreadsheet-grid effects.
-- **Weapon:** A literal table, swung like a hammer.
-- **Quirk:** Super armor on full charge. Light hits don't flinch. Single jump. Slowest speed.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Heavy** | | Can't be interrupted while charging. Take 10% less damage. |
+| S1 | **SELECT** | 20 / 7 s | Hook. Pulls them to you. 30 dmg. |
+| S2 | **Table Lock** | 30 / 13 s | Slam next to you. Stun 1.2 s. |
+| S3 | **DROP TABLE** | 40 / 20 s | Leap to a spot. 130 dmg. Breaks summons. |
 
-**Set A: "ACID"** (grappler)
-- **Passive, Backup:** Snapshots your HP every 20 s (a ghost bar on the HUD).
-- **SELECT * FROM (25 / 10 s):** A query beam pulls the opponent to you (command grab, mid range).
-- **Table Lock (30 / 15 s):** Locks the opponent in place for 1 s, or 1.5 s (the hard-CC cap) if you just pulled them.
-- **ROLLBACK (35 / 22 s):** Restores your HP to the last snapshot, up to +150.
-- **Combo:** SELECT pulls them in → Table Lock → full-charge table slam. ROLLBACK covers the damage you took getting in.
+### 7. DevOps Engineer · Builder
+Basic: melee, charge 0.9 s, 24 / 75 dmg · Speed ●●●
 
-**Set B: "Destructive Queries"** (bruiser)
-- **Passive, Indexed:** Each hit on the same opponent gives −10 % charge time (max −40 %). Resets after 4 s without a hit.
-- **JOIN (25 / 12 s):** Links both fighters for 4 s. 40 % of the damage either one takes is mirrored to the other. The tank wins that trade.
-- **DROP TABLE (45 / 24 s):** Leap and slam. 150 AoE damage, and it destroys summons and placed objects. Your table is gone for 4 s, so your basics become weak punches.
-- **Combo:** JOIN → quick hits stack Indexed → DROP TABLE as the finisher. Also the hard counter to summoners.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Pipeline** | | Every 3 skills: 5 s of +20% speed. |
+| S1 | **Container** | 20 / 9 s | Drop a crate wall (150 HP). |
+| S2 | **Conveyor** | 30 / 13 s | Belt, 6 s. Pushes enemies your way. |
+| S3 | **Push to Prod** | 40 / 16 s | Crate falls on a spot after 1 s. 120 dmg. |
 
----
+### 8. Cloud Engineer · Artillery
+Basic: melee, charge 0.9 s, 23 / 72 dmg · Speed ●●●
 
-### 7. DevOps Engineer: "Automates the fight" *(brainstormed)*
-Theme: CI/CD, containers, pods, rollbacks, on-call pagers, "works on my machine".
-- **Art:** Hazard orange and black stripes, an industrial pipes-and-steam look.
-- **Weapon:** Pipe wrench.
-- **Quirk:** Builds structures (with HP) that both players can stand on.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Elastic** | | Dash goes 50% farther. |
+| S1 | **Rain Cloud** | 20 / 7 s | Rain on a spot, 3 s. 25 dmg/s. Makes them Wet. |
+| S2 | **Cold Start** | 30 / 12 s | Hail on a spot. 40 dmg, slow 40% for 2 s. |
+| S3 | **Lightning** | 40 / 16 s | Strike a spot. 100 dmg, 200 if Wet. |
 
-**Set A: "CI/CD Pipeline"** (builder)
-- **Passive, Pipeline:** Each skill fills a stage (Build → Test → Deploy). When all 3 are full you're **Deployed** for 5 s: +20 % charge speed and ×2 Motivation regen.
-- **Container (25 / 12 s):** Drop a shipping container (150 HP) that works as a wall or platform.
-- **Conveyor (30 / 15 s):** Lay a belt on the floor for 6 s that pushes the opponent in a direction you choose.
-- **Push to Prod (30 / 14 s):** A container drops from the sky at a target spot after 1 s. 100 dmg.
-- **Combo:** Conveyor pushes them into the Container wall → Push to Prod lands → Deployed buff for the follow-up.
+### 9. Technical Support · Summoner
+Basic: ranged, charge 0.8 s, 16 / 50 dmg · Speed ●●●
 
-**Set B: "On-Call"** (reactive)
-- **Passive, Monitoring:** Every time the opponent casts a skill, you get an alert ping and +8 Motivation.
-- **Pod Replicas (35 / 18 s):** Spawn 2 mini clones (40 HP each) that copy your basics at 30 % damage for 6 s. Each pod restarts once when it dies.
-- **Rollback Deploy (25 / 14 s):** Cleanse all debuffs and return to your position from 2 s ago.
-- **Works on My Machine (20 / 10 s):** Ignore the next status effect within 3 s.
-- **Combo:** The opponent's skills feed your Motivation → Pods triple your charged basics → Rollback if the push fails.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Hold Music** | | Enemies near your customers: slow 15%. |
+| S1 | **Ticket Fan** | 20 / 6 s | 3 tickets in a fan. 20 each. |
+| S2 | **Angry Customer** | 30 / 12 s | Customer pet, 8 s. Chases and shoves. Max 2. |
+| S3 | **Escalate** | 40 / 20 s | Turns a customer into a Manager. Slam stuns 0.8 s. |
 
----
+### 10. Cybersecurity Analyst · Defender
+Basic: melee, charge 0.9 s, 22 / 68 dmg · Speed ●●
 
-### 8. Cloud Engineer: "Literally clouds, strikes anywhere"
-- **Art:** Pastel sky dithering, fluffy whites, a soft sprite with no black outline.
-- **Weapon:** An umbrella. Hold jump to glide.
-- **Quirk:** Triple jump and glide. Weak up close.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Hardened** | | Every 5 s untouched: +30 shield (max 90). |
+| S1 | **Firewall** | 20 / 10 s | Wall in front, 4 s. Your shots pass. |
+| S2 | **Mirror** | 30 / 14 s | 1 s. Reflects shots and half of melee. |
+| S3 | **Zero-Trust** | 40 / 18 s | Bubble, 3 s. Blocks 100, then explodes. |
 
-**Set A: "Weather Forecast"** (artillery)
-- **Passive, Auto-Scaling:** Your clouds grow 20 % bigger every second they're alive.
-- **Rain Cloud (20 / 7 s):** Target anywhere. It rains 20/s for 3 s and makes the target "Wet".
-- **Lightning Strike (35 / 14 s):** Target anywhere. A 0.8 s warning, then 100 dmg, or **200 against a Wet target**.
-- **Cumulus (15 / 8 s):** Spawn a solid cloud platform anywhere for 5 s.
-- **Combo:** Rain → Wet → Lightning. Cumulus gives you height to kite from.
+### 11. Data Scientist · Ranged
+Basic: ranged, charge 0.8 s, 18 / 60 dmg · Speed ●●●
 
-**Set B: "Multi-Region"** (anchors)
-- **Passive, High Availability:** Once per round, lethal damage fails you over to a living cloud anchor with 100 HP. With no anchor alive, nothing happens.
-- **Deploy Region (15 / 10 s):** Place a cloud anchor anywhere (max 2, 60 HP each).
-- **Serverless Strike (30 / 12 s):** A cloud fist launches from *every* anchor at the opponent, 60 each.
-- **Cold Start (25 / 16 s):** A hail cloud anywhere: 30 dmg, and slows 40 % for 3 s.
-- **Combo:** 2 anchors give a crossfire. Cold Start makes them hard to dodge. Anchors are also your extra life, so the opponent has to choose between chasing you and destroying them.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Outlier** | | 15% of hits crit for x1.5. |
+| S1 | **Regression** | 20 / 7 s | Shot aimed where they will be. 50 dmg. |
+| S2 | **Confidence Band** | 30 / 14 s | Zone, 3 s. Every hit inside crits. |
+| S3 | **Remove Outliers** | 40 / 18 s | Big blast. 90 dmg. Deletes summons and traps. |
 
----
+### 12. AI/ML Engineer · Summoner
+Basic: ranged, charge 1.0 s, 17 / 52 dmg · Speed ●●●
 
-### 9. Technical Support: "Customers and Tickets"
-- **Art:** Hi-vis yellow polo, blue headset, comic-strip "!!!" speech bubbles over customers.
-- **Weapon:** A stack of tickets. Tap throws one ticket, full charge throws a stapled bundle.
-- **Quirk:** Taunt plays hold music (cosmetic, very annoying).
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Learning** | | Your bot levels up as it hits (max 3). |
+| S1 | **Deploy Bot** | 25 / 10 s | Bot pet, 12 s (150 HP). Bites 12 dmg/s. |
+| S2 | **Drones** | 30 / 13 s | 2 drones orbit you, 6 s. They shoot with you. |
+| S3 | **Agentic Loop** | 40 / 18 s | All your pets rush them. +50% damage, 4 s. |
 
-**Set A: "Escalation"** (summoner)
-- **Passive, CSAT Score:** Each hit by your customers adds a ★ (max 5). At 5★ your next summon comes already escalated and costs 0.
-- **Angry Customer (30 / 12 s):** Summon a customer (100 HP, 8 s) who chases and shoves for 20 dmg. Max 2.
-- **Escalate to Manager (35 / 20 s):** Turn a living customer into a **Manager** (250 HP) with a 60-dmg slam that stuns 0.8 s, and a shouting cone. With no customer alive, it summons a normal one.
-- **Ticket Barrage (15 / 5 s):** 3 tickets in a fan, 20 each.
-- **Combo:** Customers pressure → ★ builds → a free Manager. Barrage covers your approach.
+### 13. Business Analyst · Damage over time
+Basic: melee, charge 0.8 s, 19 / 60 dmg · Speed ●●●
 
-**Set B: "Help Desk"** (burnout pressure)
-- **Passive, Turn It Off and On Again:** Once every 25 s, a CC or debuff applied to you is cleansed after 0.3 s (a quick "reboot" animation).
-- **Put on Hold (25 / 10 s):** A hold-music field for 3 s. Inside it, the opponent has **no Motivation regen** and skills cost +10.
-- **Mass Ticket (35 / 16 s):** 6 tickets rain from the top of the screen over 2 s, 20 dmg each.
-- **Customer Mob (40 / 20 s):** 3 small customers stampede across the floor, 30 dmg each. Jump to avoid them.
-- **Combo:** Put them on Hold → they can't afford skills → Mob and Mass Ticket force guard and dash, which costs Motivation → Burnout.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Interest** | | Each hit adds Debt (max 8). Debt deals 2 dmg/s each. |
+| S1 | **Sticky Note** | 20 / 6 s | Shot. 20 dmg, +3 Debt. |
+| S2 | **Scope Creep** | 30 / 13 s | Growing zone, 5 s. +1 Debt/s, slow 20%. |
+| S3 | **Due Date** | 40 / 20 s | Cash in all Debt. 20 dmg each. |
 
----
+### 14. Project Manager · Controller
+Basic: melee, charge 1.0 s, 24 / 75 dmg · Speed ●●●
 
-### 10. Cybersecurity Analyst: "Defense and reflection"
-- **Art:** Monochrome black with one red accent, hoodie, padlock motifs.
-- **Weapon:** A riot "firewall" shield and a baton.
-- **Quirk:** Guard blocks 85 % (not 70 %), and the first block every 3 s costs no Motivation. Slowest dash.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Velocity** | | Each skill hit: -5% cooldowns (max 4). |
+| S1 | **Assign Ticket** | 20 / 7 s | Sticks to them. Explodes after 3 s. 80 dmg. |
+| S2 | **Deadline** | 30 / 14 s | Bubble, 4 s. Enemies and shots inside: -40% speed. |
+| S3 | **Code Freeze** | 40 / 18 s | Shot. 30 dmg, Stun 1.4 s. |
 
-**Set A: "Defense in Depth"** (layers)
-- **Passive, Hardened:** Every 5 s without being hit, gain a shield layer that absorbs 30 (max 3).
-- **Firewall (25 / 12 s):** A wall in front of you for 4 s. Blocks projectiles and summons, and your own attacks pass through it.
-- **Mirror Protocol (30 / 15 s):** A 1 s window that reflects 100 % of projectiles and 50 % of melee damage.
-- **Patch (20 / 14 s):** Restore all shield layers right away.
-- **Combo:** Patch to full layers → bait aggression → Mirror Protocol. Firewall hard-counters zoners.
+### 15. UI/UX Designer · Rushdown
+Basic: melee, charge 0.5 s, 13 / 42 dmg · Speed ●●●●●
 
-**Set B: "Red Team"** (trickster defense)
-- **Passive, Threat Intel:** After reflecting or blocking 3 attacks, your next basic is instantly fully charged.
-- **Honeypot (25 / 14 s):** Place a fake item that looks like a real buff. Picking it up stuns for 1 s.
-- **Zero-Trust Bubble (30 / 16 s):** A 3 s bubble that absorbs damage, then explodes for 50 % of what it absorbed.
-- **Encrypt (20 / 12 s):** Your sprite scrambles for 2 s. Their homing and targeted skills lose lock.
-- **Combo:** Honeypot near a real item spawn → stun → instant full-charge from Threat Intel.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Flow State** | | Each hit in a row: +5% speed (max 25%). |
+| S1 | **Grid Snap** | 20 / 6 s | Blink. Your next hit crits. |
+| S2 | **Drag & Drop** | 30 / 12 s | Grab and throw. 40 dmg, +20 and stun into a wall. |
+| S3 | **Make It Pop** | 40 / 16 s | 5 fast stabs, 16 each. |
 
----
+### 16. Technical Writer · Trapper
+Basic: ranged, charge 0.8 s, 18 / 55 dmg · Speed ●●●
 
-### 11. Data Scientist: "Probability" *(brainstormed)*
-Theme: regression, outliers, sampling, confidence intervals, p-values, overfitting.
-- **Art:** A rainbow chart palette of categorical dots, graph-paper background effects.
-- **Weapon:** A notebook that fires scatter-plot dots in a 3-dot spread.
-- **Quirk:** Damage has ±20 % variance, and big rolls show as critical hits.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Track Changes** | | Full-charge hits leave ink: you +15% speed, them -15%. |
+| S1 | **RTFM** | 20 / 7 s | Heavy manual. 65 dmg, knockback. |
+| S2 | **Paragraph** | 30 / 12 s | Text wall, 6 s. Blocks moves and shots. |
+| S3 | **Redact** | 40 / 18 s | Black bar on a spot. 40 dmg, Silence 2 s. |
 
-**Set A: "Predictive Model"** (data-driven sniper)
-- **Passive, Training Data:** Each hit adds a data point (max 10). More data means bigger skill hitboxes. At 10 you have a **Trained Model**: +15 % crit chance.
-- **Linear Regression (25 / 8 s):** A 60-dmg line projectile aimed where the opponent *will be* in 0.5 s, based on their movement.
-- **Confidence Interval (30 / 14 s):** A shaded band for 3 s. Every hit on a target inside it is a crit.
-- **Combo:** Spread shots collect data → Regression snipes → Confidence Interval cashes in guaranteed crits.
+### 17. Vibe Coder · Burst
+Basic: ranged, charge 0.6 s, 15 / 46 dmg · Speed ●●●●
 
-**Set B: "Monte Carlo"** (gambler)
-- **Passive, Regression to the Mean:** Your damage rolls 50–150 %. Three below-average rolls in a row make the next hit a guaranteed 200 %.
-- **Random Sample (20 / 7 s):** 5 dots appear at random points around the opponent, then converge on them, 18 dmg each.
-- **p < 0.05 (30 / 15 s):** Your next 3 attacks roll twice and keep the better result.
-- **Remove Outliers (35 / 18 s):** Deletes every enemy summon and trap in a wide area, and does 80 if it hits the opponent.
-- **Combo:** p-hack buff → Random Sample. Remove Outliers is your answer to summoners and trappers.
-
----
-
-### 12. AI/ML Engineer: "The bot does the work"
-- **Art:** Purple and magenta holographic glitch with chromatic-aberration pixels. The bot is a one-eyed cube.
-- **Weapon:** A holo-tablet that fires a weak zap. Personally weak and slow to charge.
-- **Quirk:** Bots move autonomously and have their own AI. Hardest to play well.
-
-**Set A: "Reinforcement Learning"** (one strong bot)
-- **Passive, Learning Rate:** The bot gains XP when it hits. **Lv2:** +HP and damage. **Lv3:** unlocks a laser beam. Resets each round.
-- **Deploy Model (30 / 15 s after it dies):** Summon the Bot (150 HP, bites for 12 dmg/s). While it's alive, recasting tells it to dash at the opponent (10 Motivation).
-- **Fine-Tune (20 / 10 s):** The bot gets +1 level for 6 s, or heals 50 % if it's already Lv3.
-- **Hallucinate (25 / 12 s):** The bot projects 2 decoys of you for 3 s.
-- **Combo:** The bot pressures → decoys confuse who to hit → Fine-Tune for a Lv3 laser burst.
-
-**Set B: "Multi-Agent"** (swarm)
-- **Passive, Orbit:** Up to 3 tiny agent drones orbit you and fire an 8-dmg shot whenever you release a basic.
-- **Spawn Agent (20 / 6 s):** +1 drone (30 HP), max 3.
-- **Agentic Loop (35 / 16 s):** Drones leave orbit and hunt the opponent on their own for 5 s, each firing every 0.5 s.
-- **Prompt Injection (30 / 18 s):** Hijack an enemy summon or turret for 5 s. With none on the field, the opponent's left and right controls flip for 1.5 s.
-- **Combo:** 3 drones → each charged basic is a 4-hit volley → Agentic Loop for an off-screen pincer.
-
----
-
-### 13. Business Analyst: "Technical Debt"
-- **Art:** A corporate gray suit and toxic-green debt sludge dripping off spreadsheet cells.
-- **Weapon:** A requirements binder (melee) and sticky notes.
-- **Quirk:** Even tap attacks apply 1 Debt, so tapping has a purpose for this job.
-- **Debt (both sets):** each stack deals 1 dmg/s (max 10 stacks unless the set says otherwise). Debt fades one stack every 4 s if no new Debt was applied.
-
-**Set A: "Compound Interest"** (DoT stacker)
-- **Passive, Interest:** Every 6 s, +1 Debt stack accrues as interest (Debt max 8 in this set). **Counterplay:** each hit the opponent lands on you pays off 1 stack.
-- **Quick Workaround (20 / 6 s):** A sticky-note throw. +3 Debt.
-- **Scope Creep (30 / 14 s):** A zone that slowly grows for 5 s. Inside it: +1 Debt/s and −20 % speed.
-- **Due Date (40 / 22 s):** Calls in the debt. Consumes every stack for 20 dmg each.
-- **Combo:** Stack debt → let interest grow while you play keep-away → Due Date at 6–8 stacks for 120–160.
-
-**Set B: "Morale Drain"** (burnout specialist)
-- **Passive, Debt Fatigue:** Each Debt stack lowers the opponent's Motivation regen by 6 % (max −40 %).
-- **Legacy Code (25 / 10 s):** A spaghetti-code puddle for 6 s. Standing in it builds Debt.
-- **Deprioritize (30 / 15 s):** Adds +2 s to all of the opponent's current cooldowns.
-- **Stakeholder Sign-off (30 / 16 s):** Self-buff for 4 s: immune to slow, and heal 4 HP/s per Debt stack on the opponent.
-- **Combo:** Puddle stacks debt → their regen falls apart → Deprioritize → they Burn Out trying to keep up.
-
----
-
-### 14. Project Manager: "Tickets and timelines"
-- **Art:** A navy suit. Each skill effect is a colored Gantt bar, with clocks and calendar pages.
-- **Weapon:** An alarm clock on a chain. The flail wraps around and can hit behind you.
-- **Quirk:** Very high skill ceiling built around timing.
-
-**Set A: "Sprint Board"** (ticket burst)
-- **Passive, Velocity:** Each skill that lands gives a Velocity stack (max 4): −5 % cooldowns each. Burnout resets it.
-- **Assign Ticket (20 / 6 s):** A ticket sticks to the opponent and moves To Do → In Progress → Done over 3 s. On Done it does 70. Each hit you land moves it one column sooner. If they hit you first, it becomes **Blocked** and fizzles.
-- **Code Freeze (35 / 22 s):** Freezes the opponent for 1.2 s.
-- **Rewind Sprint (30 / 18 s):** Snaps the opponent back to where they were 3 s ago and cancels their current action.
-- **Combo:** Assign → Code Freeze → two quick hits push it to Done → Velocity shortens your cooldowns.
-
-**Set B: "Timeline Control"** (tempo)
-- **Passive, Crunch Time:** In the last 30 s of a round you get ×1.5 Motivation regen, and Burnout doesn't slow you.
-- **Move the Deadline (25 / 14 s):** A slow-time bubble for 4 s. The opponent and projectiles inside move −40 %.
-- **Fast-Track (25 / 14 s):** Haste yourself for 4 s: +35 % speed and charge speed.
-- **Push to Backlog (35 / 18 s):** Disables the opponent's last-used skill for 5 s.
-- **Combo:** Slow them, haste yourself, backlog their escape tool. You get stronger as the timer runs down.
-- *Spicy option:* **Extend Sprint**. Once per round, add or remove 5 s from the round clock.
-
----
-
-### 15. UI/UX Designer: "Pixel-perfect rushdown" *(brainstormed)*
-Theme: wireframes, grids, A/B tests, drag and drop, "make it pop", user flows.
-- **Art:** Flat design. Bright pastels, **no outlines**, and the smoothest animations in the game (more frames).
-- **Weapon:** A stylus used as a rapier. Fast, low-damage pokes.
-- **Quirk:** The fastest fighter. Can cling to walls and wall-jump. Lightest, so they get knocked the farthest.
-
-**Set A: "Design System"** (precision)
-- **Passive, Pixel Perfect:** Hitting with the exact tip of the rapier (the sweet spot) does +35 % and refunds 5 Motivation.
-- **Wireframe (25 / 10 s):** Leave a wireframe outline of yourself. Recast within 4 s to teleport back to it.
-- **Drag & Drop (30 / 14 s):** Grab the opponent and drop them in a direction you choose for 40 dmg. Into a wall gives a Wall Splat.
-- **Make It Pop (35 / 16 s):** A 5-stab flurry, 15 dmg each. The last stab pops them away for knockback.
-- **Combo:** Wireframe → dive in → Drag & Drop into the wall → Make It Pop → teleport out to the Wireframe.
-
-**Set B: "User Flow"** (momentum)
-- **Passive, Flow State:** Each hit in a row without getting hit gives +5 % speed (max +25 %).
-- **Grid Snap (20 / 8 s):** Blink to the next grid point in a direction. Your next attack crits.
-- **A/B Test (30 / 15 s):** Split into A and B. One is fake and pops on any hit.
-- **Color Picker (30 / 18 s):** Copy the opponent's last-used skill and cast it at 60 % power.
-- **Combo:** Grid Snap in → flurry builds Flow → A/B Test to escape their punish. Color Picker turns their own toolkit against them.
-
----
-
-### 16. Technical Writer: "The pen is mightier" *(brainstormed)*
-Theme: manuals, RTFM, redacted, footnotes, red pen, track changes, typos.
-- **Art:** 1-bit black ink on cream paper with typewriter-font effects. The writer is drawn like an ink sketch.
-- **Weapon:** A fountain pen that flicks ink in an arc. Full charge leaves an ink blot puddle.
-- **Quirk:** Words written on screen become real terrain.
-
-**Set A: "The Manual"** (control)
-- **Passive, Documented:** The first time the opponent uses each skill on you, it gets logged. You take −15 % damage from logged skills for the rest of the round.
-- **RTFM (25 / 10 s):** Throw a heavy manual. 80 dmg and a knockdown.
-- **Redact (30 / 16 s):** A black bar slams over the opponent and silences their skills for 2 s.
-- **Footnote* (20 / 8 s):** Place a tiny asterisk mine (max 2). It detonates for 50 when touched.
-- **Combo:** Footnotes on their approach path → RTFM knockdown onto a mine → Redact stops their comeback.
-
-**Set B: "Red Pen"** (terrain)
-- **Passive, Track Changes:** Your ink puddles give you +15 % speed and slow the opponent 15 %.
-- **Write a Paragraph (20 / 10 s):** Write a text block that becomes a solid wall or platform for 6 s.
-- **Strikethrough (25 / 9 s):** A horizontal line across the whole screen at your height. 65 dmg, and it cancels projectiles.
-- **Typo (30 / 14 s):** Curses the opponent. Their next skill misfires in the wrong direction.
-- **Combo:** Paragraph platforms put you above them → Strikethrough on a level they can't jump → Typo wrecks their answer.
-
----
-
-### 17. Vibe Coder: "Burst, then rate-limited"
-- **Art:** Vaporwave pink and teal dithered gradients, sunglasses, an oversized hoodie, sparkle effects on every skill.
-- **Weapon:** A laptop covered in stickers that fires glowing prompt bubbles.
-- **Quirk:** A **second resource, Tokens (100).** Skills cost Tokens *plus* a small Motivation cost, so Burnout still applies. Tokens regen 10/s only after 2 s of casting no skills. **At 0 Tokens you're Rate Limited for 5 s:** skills are disabled, you do −30 % damage, you take +15 % damage, and then Tokens refill fully.
-
-**Set A: "Prompt & Pray"** (pure burst)
-- **Passive, Context Window:** The first skill after a full Token bar does +30 % damage.
-- **Generate (35 Tok + 10 M / 4 s):** A big code-blast projectile. 80 dmg.
-- **Accept All Changes (45 Tok + 10 M / 12 s):** A 6-hit auto-dash flurry, 18 each. You can't steer it.
-- **Regenerate (20 Tok + 5 M / 6 s):** Re-casts your last skill at 60 % power. 25 % chance it **hallucinates** and fires in a random direction.
-- **Combo:** Full bar → Generate (+30 %) → Accept All → Regenerate for about 280 burst in 3 s. The full combo costs exactly 100 Tokens, so you're Rate Limited right after and very vulnerable.
-
-**Set B: "Ship It Friday"** (sustain the vibe)
-- **Passive, Vibes:** Every hit you land refunds 5 Tokens. Every hit you take costs 5 Tokens.
-- **Autocomplete (20 Tok + 5 M / 3 s):** A homing tab-key projectile. 35 dmg.
-- **YOLO Deploy (50 Tok + 15 M / 15 s):** An explosion around you. 150 dmg to them, 50 to you.
-- **Touch Grass (no cost / 16 s):** Sit on grass for 1.5 s, rooted and open to hits, and refill Tokens completely. Can't be used while Rate Limited.
-- **Combo:** Land Autocompletes to keep Tokens up → YOLO Deploy at close range → Touch Grass in a safe moment to reset.
+| | Skill | Cost / CD | What it does |
+|---|---|---|---|
+| Passive | **Context Window** | | First skill after 6 s of no skills: +30% damage. |
+| S1 | **Autocomplete** | 20 / 5 s | Homing shot. 35 dmg. |
+| S2 | **Generate** | 30 / 10 s | Big blast. 85 dmg. |
+| S3 | **YOLO Deploy** | 40 / 18 s | Explode around you. 150 dmg. You take 50. |
 
 ---
 
@@ -511,27 +329,27 @@ Theme: manuals, RTFM, redacted, footnotes, red pen, track changes, typos.
 
 ## 5. Arenas
 
-All arenas are closed (walls on both sides and a ceiling). Each has a **main floor, 2–4 platforms, one terrain gimmick and one hazard**.
+Every arena is a closed room seen from above, about 15 × 9 tiles. Each has **2–4 pieces of cover, one gimmick and one hazard**.
 - There's a "Hazards OFF" toggle for competitive play.
-- One flat "Terminal" map is always available.
+- The flat "Terminal" arena is always available.
 
-| Arena | Look | Terrain | Hazard (toggleable) |
+| Arena | Look | Cover and gimmick | Hazard (toggleable) |
 |---|---|---|---|
-| **Open Office** (starter) | Cubicles and fluorescent lights | Desks as platforms. A rolling chair you can ride by dashing onto it | The printer jams every 30 s and sprays paper projectiles |
-| **Server Room** | Blue LEDs, rack rows | Raised floor. Cable trays as platforms. Hot-aisle vents launch you up | **Power outage:** 4 s of near-darkness, only silhouettes visible |
-| **Startup Garage** | Whiteboards, ping-pong table | Beanbags bounce you. The ping-pong table is a platform | **Funding Round:** an item rain (3 items at once) |
-| **Cloud Region** | Literally above the clouds | Drifting cloud platforms. Soft floor | Wind gusts push everyone sideways |
-| **Legacy Basement** | A green-screen mainframe, dripping pipes | Punch-card conveyor belts | Spaghetti-cable patches on the floor slow movement |
-| **Tech Expo Hall** | Booths, banners, a stage | Booths as platforms | A stage spotlight wanders. Standing in it gives +15 % damage |
-| **Coffee Shop** | Warm lofi café | Tables and the counter as platforms | Coffee spawns twice as often. Wi-Fi drops (Network Admin's AP turns off for 5 s) |
-| **3 AM War Room** | Red alert monitors, empty pizza boxes | Desk clusters | **"Prod is down" siren:** every 30 s, both players lose 15 Motivation |
-| **Home Office** | Bedroom, bed, desk | The bed bounces you. A shelf platform | A cat walks across and blocks the first attack it touches. The doorbell drops a delivery item |
-| **Hackathon Night** | Dim lights, laptops, energy cans | Stacked tables | The lights dim more as the timer runs down |
-| **Team-Building Retreat** | Pine forest, lake, waterfall, full moon at night | Log platforms, a rock ledge, the lake shore | A campfire in the middle burns 10 dmg/s. A "trust fall" platform drops whoever stands on it for 3 s |
-| **Campus Rooftop** | Bright daytime sky, puffy clouds, glass office towers | Rooftop AC units and a water tower as platforms | A window-cleaning gondola slides across one platform level |
-| **The Terminal** (competitive) | Black and green code space | One flat floor, two symmetric platforms | None |
+| **Open Office** (starter) | Cubicles, fluorescent lights | Desk clusters. A rolling chair you can ride by dashing into it | The printer jams every 30 s and sprays paper shots |
+| **Server Room** | Blue LEDs, rack rows | Server racks in two rows. Hot-aisle vents push you | **Power outage:** 4 s of near-darkness, only outlines visible |
+| **Startup Garage** | Whiteboards, ping-pong table | Beanbags bounce you. The ping-pong table blocks shots | **Funding Round:** 3 items drop at once |
+| **Cloud Region** | Above the clouds | Drifting cloud blocks that move slowly | Wind gusts push everyone sideways |
+| **Legacy Basement** | Green-screen mainframe, pipes | Punch-card conveyor belts | Spaghetti cables on the floor slow you |
+| **Tech Expo Hall** | Booths, banners, a stage | Booths as cover | A spotlight wanders. Standing in it gives +15% damage |
+| **Coffee Shop** | Warm lofi café | Tables and the counter | Coffee spawns twice as often. Wi-Fi drops (Network Admin's router turns off for 5 s) |
+| **3 AM War Room** | Red alert monitors, pizza boxes | Desk clusters | **"Prod is down" siren:** every 30 s, both lose 15 Motivation |
+| **Home Office** | Bedroom, bed, desk | The bed bounces you. A bookshelf blocks shots | A cat walks across and blocks the first attack it touches |
+| **Hackathon Night** | Dim lights, laptops, energy cans | Stacked tables | The lights dim as the timer runs down |
+| **Team-Building Retreat** | Pine forest, lake, full moon | Logs and rocks. The lake shore slows you | A campfire in the middle burns 10 dmg/s |
+| **Campus Rooftop** | Daytime sky, glass towers | AC units and a water tower | A window-cleaning gondola slides across the roof |
+| **The Terminal** (competitive) | Black and green code space | Two symmetric blocks | None |
 
-**Job and map synergy:** Cloud Engineer likes Cloud Region, Network Admin hates Coffee Shop, DevOps likes the Legacy Basement conveyors. This gives map picks some strategy (the loser of a round picks the next map?).
+**Job and arena synergy:** Cloud Engineer likes Cloud Region, Network Admin hates the Coffee Shop, DevOps likes the Legacy Basement conveyors.
 
 ---
 
@@ -547,10 +365,10 @@ Pick a map, the opponent's job and set (or random), and a difficulty.
 
 | Level | Name | Reaction time | How it plays |
 |---|---|---|---|
-| 1 | Intern | 600 ms | Walks straight in and taps basics. Rarely guards, uses skills at random, often burns out |
-| 2 | Junior | 400 ms | Sometimes charges its basics, uses skills as soon as they're off cooldown, guards about 20 % of the time |
-| 3 | Mid-level | 280 ms | Charges to full, guards and dashes, stops spending below 25 Motivation, goes for items |
-| 4 | Senior | 200 ms | Plays its set's combo, punishes your Burnout and missed full charges, plays around your cooldowns |
+| 1 | Intern | 600 ms | Walks straight in and taps basics. Rarely dodges, uses skills at random, often burns out |
+| 2 | Junior | 400 ms | Sometimes charges its basics, uses skills as soon as they're off cooldown, dodges about 20 % of the time |
+| 3 | Mid-level | 280 ms | Charges to full, dashes through shots, uses cover, stops spending below 25 Motivation, goes for items |
+| 4 | Senior | 200 ms | Plays its kit's combo, punishes your Burnout and missed full charges, plays around your cooldowns |
 | 5 | Principal | 150 ms | Adapts to your habits (for example, starts catching you if you always dash the same way), Crunch Casts for the KO, contests item spawns |
 
 - **No cheating at any level.** The CPU never reads your inputs. Difficulty comes only from reaction time and decision quality, so losing to it feels fair.
@@ -739,63 +557,47 @@ Every job and both sets are available from the start, so online is always fair. 
 
 ## 7. Controls
 
-### 7.1 Desktop browser: keyboard
-All keys can be rebound. While a match is running, the game stops Space and the arrow keys from scrolling the page. No action uses Ctrl/Cmd shortcuts the browser already reserves (like closing the tab).
+Same 6 actions everywhere: **Move, Aim, Attack (hold), Dash, Skill 1, Skill 2, Skill 3.**
 
-| Action | Key |
+### 7.1 Keyboard and mouse
+| Action | Input |
 |---|---|
-| Move | A / D |
-| Jump / Double jump | W or Space |
-| Crouch / drop through platform | S |
-| **Basic attack (hold to charge)** | J |
-| Guard (hold) | K |
-| Dash | L (or double-tap a direction) |
-| Skill 1 / 2 / 3 | U / I / O |
-| Pause / menu | Esc. In online matches this opens the menu without pausing the game |
+| Move | W A S D |
+| Aim | Mouse |
+| Attack (hold to charge) | Left click |
+| Dash | Space or Shift (dashes the way you're moving) |
+| Skills 1 / 2 / 3 | Q / E / R (cast at the cursor) |
+| Menu | Esc |
 
-**Targeted skills on PC:** tap = smart cast at the opponent's position. Hold = a reticle appears on the opponent, you move it with the movement keys, and release to cast.
-
-**Optional mouse scheme:** left click = attack (hold to charge), right click = guard, Q/E/R = skills aimed at the cursor, Shift = dash.
+**Keyboard only:** arrows move, J attack, K dash, U / I / O skills. Everything auto-aims at the opponent. All keys can be rebound.
 
 ### 7.2 Gamepad
 | Action | Button |
 |---|---|
-| Move | Left stick or D-pad |
-| Jump | A / Cross |
-| Attack (hold) | X / Square |
-| Dash | B / Circle |
-| Guard | R1 |
-| Skill 1 / 2 / 3 | Y / L1 / R2 |
-| Aim a targeted skill | Right stick while holding the skill button |
+| Move | Left stick |
+| Aim | Right stick (let go to auto-aim) |
+| Attack (hold) | Right trigger |
+| Dash | Left trigger or A / Cross |
+| Skills 1 / 2 / 3 | X / Y / B (Square / Triangle / Circle) |
 
-Gamepads work in the browser through the Gamepad API (Chrome, Edge, Firefox and Safari).
-
-### 7.3 Mobile browser (landscape)
+### 7.3 Mobile (landscape)
 ```
  ┌───────────────────────────────────────────────────────────┐
- │ [P1 HP ███████░░] [⏱ 72] [░░███████ P2 HP]          [II] │
- │ [Motivation ████░]                   [░████ Motivation]  │
+ │ [SE ███████░░]          [⬡ 62]          [░░███████ DB]   │
  │                                                           │
- │                     (game view)                           │
- │                                            (S1)           │
- │                                        (S2)    (S3)       │
- │    ╭───╮                           [GUARD]                │
- │   ( ◎  )  ← floating joystick           (  ATTACK  )      │
- │    ╰───╯                          [DASH]       [JUMP]     │
+ │                  (arena, seen from above)                 │
+ │                                              (S3)         │
+ │                                          (S2)             │
+ │   ╭───╮                              (S1)   ( ATTACK )    │
+ │  (  ◎  )  ← floating joystick                 [DASH]      │
+ │   ╰───╯                                                   │
  └───────────────────────────────────────────────────────────┘
 ```
-- **Left thumb:** a floating joystick that appears where your thumb lands. An 8-bit D-pad is available as an option.
-- **Right thumb:** a big **ATTACK** button. Holding it fills a **radial charge ring**, which also shows on the character, and a full charge gives a haptic buzz.
-- **Skill buttons** sit in an arc above Attack. They show a cooldown sweep and their Motivation cost, and turn gray when you can't afford them. **Long-press a gray skill to Crunch Cast** (red warning flash).
-- **Targeted skills:** tap = smart cast on the opponent. **Drag from the skill button to aim, release to cast** (MOBA-style). Drag back to the button to cancel.
-- **Swipe anywhere on the right half** = dash in that direction. It's an alternative to the Dash button.
-- Fighters always face the opponent automatically.
-- Accessibility:
-  - Buttons are at least 56 pt.
-  - The layout is editable, with a mirrored layout for left-handed players.
-  - Haptics can be turned off.
-  - Optional **Hold-to-Charge Assist**: tap twice to auto-charge to full.
-- The thumb controls cover the lower corners of the screen, so map design keeps platforms and item spawn points out of those corners.
+- **Left thumb:** a floating joystick that appears where you touch.
+- **ATTACK:** hold to charge (a ring fills around the button and the fighter). Drag while holding to aim.
+- **Skills:** tap to auto-aim. Drag to aim, release to cast, drag back to cancel. Each shows its cooldown and cost, and turns gray when you can't afford it. Long-press a gray skill to Crunch Cast.
+- **DASH:** tap to dash the way you're moving.
+- Buttons are at least 56 pt. The layout can be moved and mirrored for left-handed play.
 
 **Mobile browser specifics:**
 - **Touch handling:** the canvas blocks pinch-zoom, double-tap zoom, pull-to-refresh, long-press menus and text selection (`touch-action: none`, `user-select: none`).
@@ -806,138 +608,40 @@ Gamepads work in the browser through the Gamepad API (Chrome, Edge, Firefox and 
 - **Haptics:** the Vibration API works on Android but not iPhone, so haptics are a bonus, never required feedback.
 - **Audio:** browsers block sound until the first tap, so the title screen says "Tap to start".
 
-**Design constraint from mobile:** at most 3 active skills per job, and no input motions (no quarter-circles). Every skill is one button.
+---
+
+## 8. Balance
+
+- **Equal HP (1000).** Jobs differ in damage, speed, range and charge time.
+- **Slot budget:** every kit follows the S1 / S2 / S3 pattern in 1.5, so no kit gets an extra strong skill.
+- **Caps:** Stun and Root max 1.5 s, then 1 s immune. Slow max 40%. Silence max 2 s.
+- **Pets** always have HP, a timer and a max count. Area attacks break them.
+- **Every skill has an answer:** dash through it, break it, hide behind cover or punish the cooldown.
+- **Paper model:** `python3 design/kits_v3.py` scores every kit's power per second.
+  - v0.3 spread: **−3.6% to +4.4%** around the median (the v0.2 side-view kits were −13% to +11%).
+  - The model is a starting point. Once the new sim runs, CPU-vs-CPU win rates replace it (target: every job 45–55%).
+- **Playtest targets:** rounds last 45–75 s, about 1–2 Burnouts per player per round.
 
 ---
 
-## 8. Balance Framework
+## 9. Build Order
 
-- **Equal HP (1000)** for everyone. Jobs are balanced through damage, speed, weight, range and charge time instead.
-- **Power budget:** score every kit on DPS potential, burst, control seconds (stun/root/silence), mobility and sustain. Jobs high on one axis must be low on another. Examples:
-  - DBA: high burst and sustain, the lowest mobility.
-  - UI/UX: the highest mobility, the lowest per-hit damage.
-- **Caps:**
-  - Hard CC (stun, freeze, root) never exceeds 1.5 s.
-  - A target can't be hard-CC'd again for 1 s after a hard CC ends (**CC immunity window**), to prevent infinite lockdowns.
-- **Summons** always have HP, a lifetime and a max count, and AoE skills can destroy them.
-- **Three-skill jobs** get about 15 % less power per skill than two-skill jobs.
-- **Every set needs counterplay.** For each skill, write down "how does the opponent answer this?" (for example, Debt is paid off by hitting the BA).
-- **Track in playtests:** win rate per job and set, average round length (target 45–75 s), how often rounds time out, and Burnout frequency (target: about 1–2 per round per player).
-
----
-
-### 8.1 Status effects and global rules (v0.2)
-| Effect | Category | Rule |
-|---|---|---|
-| Stun, Root, Freeze, Trap, Lock, Encapsulate, "Stuck in a meeting", Inverted controls | **Hard CC** | **Max 1.5 s.** Afterwards the target is immune to hard CC for 1 s |
-| Silence (Signal Jam, Redact) | **Silence** | Blocks skills, not basics or movement. **Max 2 s**, followed by 1 s of silence immunity |
-| Slow | **Soft CC** | **Max 40 %.** Slows don't stack: the strongest one applies |
-| Cooldown push (Reopen Ticket, Deprioritize, Push to Backlog) | **Denial** | Enemy effects can add at most +5 s in total to any one cooldown |
-| Debt, bites, rain | **Damage over time** | Ticks every 0.5 s. Guard doesn't block it |
-| Critical hit | **Crit** | **×1.5 damage.** Crit sources: Data Scientist passives, Confidence Interval, Grid Snap |
-| Summons, turrets, anchors | **Entities** | Each has HP and a lifetime. AoE skills and full-charge basics hit them. Caps are per skill as listed |
-
-### 8.2 Tuning model
-- [`design/kit_budget.py`](design/kit_budget.py) scores every kit's power per second. It adds up:
-  - damage from basics
-  - damage from skills, limited by how much Motivation (or Tokens) the kit can afford
-  - damage from passives
-  - sustain (healing and shields)
-  - hard CC, valued at 40 dmg per second of CC
-  - soft utility, which is hand-estimated
-- Run `python3 design/kit_budget.py` to see the tuned numbers, or `--before` to see the v0.1 numbers.
-- **Result:** the spread went from **26.0–41.5** (−20 % to +28 % around the median) to **28.0–35.6** (−13 % to +11 %).
-- **Kits that may still score low:**
-  - Network Admin B and Cloud B are long-range kits. The model doesn't credit the safety of fighting from range, so scoring a little low is intended.
-  - Watch both in playtests.
-- **It's a paper model**, built on estimated hit rates. Once the TypeScript simulation exists, replace it with CPU-vs-CPU win rates (target: every kit between 45 % and 55 %).
-
-### 8.3 Tuning changelog, v0.1 → v0.2
-**Nerfs (the kits that scored too high):**
-- **Vibe Coder:**
-  - Basic attack full charge 70 → 60.
-  - Generate: 90 → 80 dmg, costs 35 Tokens.
-  - Accept All: 6×20 → 6×18, costs 45 Tokens.
-  - Regenerate now repeats your last skill at 60 % power. *(This fixes an exploit: re-casting Accept All for half the Tokens gave about 360 burst without ever getting Rate Limited.)*
-  - Autocomplete 40 → 35.
-- **Business Analyst:**
-  - Debt is 1 dmg/s per stack (was 2).
-  - Set A: max 8 stacks, interest every 6 s, Due Date 20 per stack.
-  - Set B: Fatigue 6 % per stack (max −40 %), Deprioritize +2 s, Sign-off 4 HP/s per stack.
-  - Debt now fades one stack every 4 s if no new Debt is applied.
-- **DevOps B:** Pod Replicas copy basics at 30 % damage. *(Before, two clones copying full basics made it the highest-burst kit, about 335.)*
-- **Software Engineer:**
-  - Basic attack full charge 75 → 70.
-  - Set A: Semicolon 45 dmg on a 6 s cooldown, Brace Cage 1.0 s, Recursion 3×30.
-  - Set B: Try/Catch −35 % and +10 Motivation, throw Error mark +30, finally 80, Hotfix 60.
-- **Mobile A:** Swipe 35, Camera Flash 12 s cooldown, Push 20 per badge.
-- **Tech Support A:** Ticket Barrage 20 per ticket.
-- **Cloud B:** failover at 100 HP, and only if an anchor is alive. Anchors have 60 HP.
-- **DBA A:** Table Lock max 1.5 s (the hard-CC cap). ROLLBACK max +150.
-- **PM A:** Velocity max 4 stacks at −5 %.
-- **UI/UX A:** Pixel Perfect +35 % (was +50 %).
-- **Data Scientist:** Basic attack full charge 3×25 → 3×20.
-
-**Buffs (the kits that scored too low):**
-- **Network Admin:**
-  - Damage falls off to 70 % at max range (falloff wasn't defined before).
-  - Ping does 20 dmg (it had no damage).
-  - Throttle snap does 60.
-  - Signal Jam costs 20.
-  - Broadcast Storm does 45 per wave.
-- **Cloud B:** Deploy Region costs 15. Serverless Strike 60 per anchor. Cold Start does 30 dmg.
-- **System Analyst:**
-  - Flowchart lines 20.
-  - Arrow Connector 55.
-  - Swimlane stuns 0.3 s on spawn.
-  - Gap Analysis 70.
-- **PM:** Assign Ticket 70. Code Freeze costs 35. Fast-Track +35 %.
-- **AI/ML Engineer:** Basic attack full charge 60 with a 1.0 s charge time.
-- **QA B:** Bug Net does 30 dmg.
-- **Mobile B:** the turret does 12 dmg/s.
-- **Technical Writer B:** Strikethrough 65.
-- **Vibe B:** Touch Grass cooldown 16 s.
-- **Data Scientist B:** Random Sample 5×18.
-
-**Missing numbers now defined:**
-- Customer 20 dmg per shove. Manager slam 60.
-- Mass Ticket 6×20. Customer Mob 3×30.
-- Bot 12 dmg/s. Drone shots 8.
-- Regression 60.
-- Drag & Drop 40. Make It Pop 5×15.
-- Crit ×1.5.
-
-## 9. Suggested MVP Roster (6 jobs that cover every archetype)
-1. **Software Engineer**: all-rounder (the "learn the game" pick)
-2. **Database Admin**: grappler / tank
-3. **Cloud Engineer**: artillery / target anywhere
-4. **Technical Support**: summoner
-5. **QA Analyst**: debuffer / burnout hunter
-6. **Vibe Coder**: glass cannon / unique resource
-
-Add the other 11 in content waves once the core feel (charge, Burnout, items) is fun.
-
-**Build order (because of online play):**
-1. Deterministic core simulation, plus rollback, with just 2 jobs on The Terminal map. Test online early, because every later feature has to stay deterministic.
-2. The lobby code service and relay.
-3. The CPU AI (Intern through Mid-level first), Vs CPU quick match and the Training Room.
-4. The remaining MVP jobs, items and arenas.
-5. Senior and Principal AI, then Career mode (the Performance Review stage, the Legacy System boss, then the secret boss).
+The top-down rebuild is planned in `ROADMAP.md`. Start with 2 jobs (Software Engineer and Database Admin) in one arena, test online early, then add the other 15.
 
 ---
 
 ## 10. Open Questions for You
 
-1. ~~Perspective~~ **Decided:** platform-lite, single screen (section 1.6).
+1. ~~Perspective~~ **Decided (v0.3):** top-down arena, single screen (section 1.6).
 2. ~~Multiplayer~~ **Decided:** Vs CPU with 5 difficulty levels, and Online PvP with lobby codes (section 6).
 3. ~~Engine~~ **Decided:** TypeScript + Phaser 3 with our own rollback over WebRTC, deployed on Vercel (section 11).
 3b. **Online extras later:** stay with lobby codes only, or add accounts, ranked matchmaking and a public "Quick Match" queue after launch?
 4. ~~Permanent buffs~~ **Decided:** they last for the rest of the round.
 5. **Mirror matches:** can both players pick the same job? I assumed yes, with an alternate palette.
-6. ~~Ultimates~~ **Decided:** none. Passive plus 2–3 skills only.
+6. ~~Ultimates~~ **Decided:** none. One passive plus 3 skills per job.
 7. ~~Brand names~~ **Decided:** keep the real names.
 8. ~~Single player~~ **Decided:** Career ladder, Vs CPU quick match and Training Room. Unlocks are cosmetic only (sections 6.3–6.5).
-9. ~~Set selection~~ **Decided:** blind-pick per match, and the loser may switch set between rounds (section 3).
+9. ~~Set selection~~ **Decided (v0.3):** one kit per job for now. More sets can come later from the archived ideas.
 
 ---
 

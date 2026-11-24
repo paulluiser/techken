@@ -26,7 +26,7 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); 
 body { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; overscroll-behavior: none; }
 #app { position: fixed; inset: 0; padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0); }
 #game { position: absolute; inset: 0; display: grid; place-items: center; }
-#game canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+#game canvas { image-rendering: crisp-edges; }
 #crt { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: repeating-linear-gradient(to bottom, #0000 0 2px, #0006 2px 3px); mix-blend-mode: multiply; }
 button { font: inherit; color: inherit; cursor: pointer; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
@@ -145,24 +145,47 @@ table.pm th:first-child, table.pm td:first-child { text-align: left; color: var(
 
 /* ---------- overlays ---------- */
 #debug { position: absolute; top: max(6px, env(safe-area-inset-top, 0px)); right: max(6px, env(safe-area-inset-right, 0px)); margin: 0; z-index: 4; font-family: var(--f-body); font-size: 16px; line-height: 1.05; color: #cfe; background: #000a; padding: 6px 8px; pointer-events: none; white-space: pre; }
-.chip { position: absolute; left: max(6px, env(safe-area-inset-left, 0px)); top: max(36px, calc(env(safe-area-inset-top, 0px) + 36px)); z-index: 4; font-family: var(--f-display); font-size: 8px; padding: 6px 8px; background: #000a; color: var(--ink-dim); border: 1px solid #333; }
+.chip { position: absolute; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + min(100vw / 1280, 100vh / 720) * 92px); z-index: 4; font-family: var(--f-display); font-size: 8px; padding: 6px 8px; background: #000a; color: var(--ink-dim); border: 1px solid #333; }
 #toast { position: absolute; left: 50%; bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 9; background: var(--ink); color: #111; padding: 8px 14px; border: 3px solid #111; max-width: 90vw; text-align: center; }
 
-/* ---------- touch ---------- */
-#touch { position: absolute; inset: auto 0 0 0; z-index: 3; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); pointer-events: none; }
-#touch.lefty { flex-direction: row-reverse; }
-#touch .pad { display: flex; gap: 8px; align-items: flex-end; pointer-events: auto; transform-origin: bottom center; }
-#touch button { width: 58px; height: 58px; border-radius: 50%; background: #ffffff22; border: 2px solid #ffffff55; color: #fff; font-family: var(--f-display); font-size: 12px; touch-action: none; }
-#touch button.small { font-size: 8px; }
-#touch button.attack { width: 76px; height: 76px; background: #ffb03a44; border-color: #ffb03acc; }
-#touch button.on { background: #ffffff66; }
-#touch .pad.right { flex-direction: column; align-items: flex-end; gap: 6px; }
-#touch .pad.right .skills, #touch .pad.right .main { display: flex; gap: 8px; align-items: flex-end; }
-#touch .pad.right .skills button { width: 48px; height: 48px; background: #59d3e833; border-color: #59d3e8aa; }
-#touch.editing .pad { outline: 2px dashed var(--accent); outline-offset: 6px; cursor: move; }
+/* ---------- game view, HUD and touch (top-down, R1) ---------- */
+#game canvas { display: block; }
+#game canvas.hud { position: absolute; inset: 0; pointer-events: none; }
+#touch { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+#pad-move { position: absolute; left: 0; top: 30%; bottom: 0; width: 45%; pointer-events: auto; }
+#touch.lefty #pad-move { left: auto; right: 0; }
+#stick-zone { position: absolute; inset: 0; touch-action: none; }
+#stick { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; background: #1a163655; border: 3px solid #ffffff88; }
+#stick .knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: #3f7fe0; border: 4px solid #1a1636; }
+#pad-act { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: max(18px, env(safe-area-inset-bottom, 0px)); width: 250px; height: 250px; pointer-events: auto; transform-origin: bottom right; }
+#touch.lefty #pad-act { right: auto; left: max(18px, env(safe-area-inset-left, 0px)); transform-origin: bottom left; }
+#touch .tb { position: absolute; border-radius: 50%; border: 4px solid #1a1636; color: #fff; font: 15px 'Lilita One', sans-serif; text-shadow: 0 2px 0 #1a1636; touch-action: none; display: grid; place-items: center; overflow: hidden; }
+#touch .tb.attack { right: 0; bottom: 0; width: 96px; height: 96px; font-size: 22px; background: linear-gradient(#ffe27a, #f39a1c); }
+#touch .tb.dash { right: 104px; bottom: 0; width: 62px; height: 62px; background: linear-gradient(#8fd4ff, #2f8fe0); }
+#touch .tb.skill { width: 64px; height: 64px; font-size: 18px; background: linear-gradient(#9b8cff, #5b45d6); --cd: 0; }
+#touch .tb.skill::before { content: ""; position: absolute; inset: 0; background: conic-gradient(#1a1636aa calc(var(--cd) * 360deg), transparent 0); }
+#touch .tb.skill.low { filter: grayscale(0.85) brightness(0.8); }
+#touch .tb.skill .lbl, #touch .tb.skill .cdt { position: relative; }
+#touch .tb.skill .cdt { position: absolute; font-size: 22px; }
+#touch .tb.skill .cdt:not(:empty) ~ .lbl, #touch .tb.skill .cdt:not(:empty) + .lbl { opacity: 0; }
+#touch .tb.s1 { right: 112px; bottom: 72px; }
+#touch .tb.s2 { right: 76px; bottom: 140px; }
+#touch .tb.s3 { right: 0; bottom: 112px; }
+#touch .tb.on { filter: brightness(1.25); transform: scale(0.95); }
+#touch .tb.cancel { filter: grayscale(1); }
+#touch.editing #pad-act { outline: 2px dashed var(--accent); outline-offset: 6px; cursor: move; }
 #touch-edit { position: absolute; left: 50%; top: 20px; transform: translateX(-50%); pointer-events: auto; background: var(--panel); border: 2px solid var(--accent); padding: 10px; display: grid; gap: 8px; text-align: center; }
 #touch-edit p { margin: 0; }
-
+/* kit card (Employee Directory, pause) */
+.kit { display: grid; gap: 6px; }
+.kit .sk { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; background: #ffffff10; border: 1px solid #ffffff22; padding: 6px 8px; }
+.kit .sk.pas { grid-template-columns: 44px 1fr; }
+.kit .gl { display: grid; place-items: center; width: 44px; height: 36px; background: #5b45d6; color: #fff; font: 14px 'Lilita One', sans-serif; }
+.kit .sk.pas .gl { background: #f0a722; }
+.kit small { color: var(--muted, #aaa); white-space: nowrap; }
+.pickgrid button:disabled { opacity: 0.45; filter: grayscale(0.7); cursor: not-allowed; }
+.pickgrid .soon { position: absolute; bottom: 2px; left: 0; right: 0; font-style: normal; font-size: 7px; }
+.pickgrid button { position: relative; }
 #rotate { display: none; }
 @media (orientation: portrait) and (pointer: coarse) {
   #rotate { display: grid; place-items: center; position: absolute; inset: 0; z-index: 10; background: var(--bg); font-family: var(--f-display); font-size: 12px; text-align: center; padding: 24px; }
@@ -171,9 +194,9 @@ table.pm th:first-child, table.pm td:first-child { text-align: left; color: var(
 
 /* generated pixel art in menus */
 .pickgrid button { padding: 2px 0 4px; display: grid; justify-items: center; gap: 1px; }
-.pickgrid button img { width: 100%; max-width: 48px; aspect-ratio: 1; image-rendering: pixelated; display: block; }
+.pickgrid button img { width: 100%; max-width: 48px; aspect-ratio: 1; display: block; }
 .pickgrid button span { font-size: 7px; }
-.sprite img.body { width: 96px; height: 96px; image-rendering: pixelated; }
+.sprite img.body { width: 96px; height: 96px; }
 img.flip { transform: scaleX(-1); }
-.vs img.vsbody { width: clamp(120px, 22vw, 240px); height: auto; aspect-ratio: 1; image-rendering: pixelated; }
-.profile img.av { width: 40px; height: 40px; image-rendering: pixelated; border: 2px solid #1b1630; }
+.vs img.vsbody { width: clamp(120px, 22vw, 240px); height: auto; aspect-ratio: 1; }
+.profile img.av { width: 40px; height: 40px; border: 2px solid #1b1630; }

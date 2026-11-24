@@ -1,63 +1,56 @@
-// TechkenOS: every menu screen, plus the glue between UI, driver and network.
+// TechkenOS: every menu screen, plus the glue between UI, driver, renderer and network.
+// R1 keeps the existing screens; R5 simplifies them (GAME_DESIGN.md 1.0 and 12).
 import "./style.css";
-import * as Phaser from "phaser";
-import * as C from "./sim/constants";
 import { ARENAS } from "./sim/arenas";
-import { JOBS, JOB_CODES, JOB_NAMES } from "./sim/registry";
-import { DEFAULT_CONFIG, PHASE_MATCH_END, type MatchConfig } from "./sim/sim";
+import { KITS } from "./sim/data/kits.gen";
+import { implementedJobs, JOB_CODES } from "./sim/jobs";
+import { PHASE_MATCH_END, type MatchConfig } from "./sim/sim";
 import { ST } from "./sim/types";
-import { Driver, implementedJobs } from "./game/driver";
-import { Autoplay, CombinedInput, Keyboard, TouchPad } from "./game/input-sources";
-import { GameScene } from "./render/GameScene";
+import { Driver } from "./game/driver";
+import { Autoplay, CombinedInput, Keyboard, TouchControls } from "./game/input-sources";
+import { Renderer } from "./render3d/renderer";
+import { SKILL_GLYPHS } from "./render3d/hud";
 import { PeerLink } from "./net/transport";
 import { PROTOCOL_VERSION, type CtrlMsg } from "./net/protocol";
 import { createLobby, fetchOffer, getIceServers, LobbyError, normalizeCode, postAnswer, waitForAnswer } from "./net/lobby-client";
 import { ACTIONS, keyLabel, loadSettings, randomGuest, resetSettings, saveSettings, validName, type ActionId } from "./ui/settings";
-import { META, PALETTES, paletteColor, paletteUnlocked } from "./ui/jobmeta";
+import { META } from "./ui/jobmeta";
 import { LEVELS } from "./ai/cpu";
-import { faceIcon, fullBodyIcon } from "./render/art/chibi";
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
 const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
-const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
 const params = new URLSearchParams(location.search);
 const DEV = import.meta.env.DEV;
+const JOB_COLORS = ["#38c98a", "#ff6b9a", "#9b6bff", "#6f7dff", "#4db6ff", "#ff9a3d", "#e0b03a", "#8fd0ff", "#f28fb0", "#3a7d8c", "#5fd0c0", "#b58cff", "#8bd45a", "#ff5d7a", "#ffcf4d", "#c9b48a", "#ff4fd8"];
 
 // ---------- settings, input, driver, renderer ----------
 let settings = loadSettings();
 const save = () => saveSettings(settings);
 const kb = new Keyboard(() => settings);
-const touch = new TouchPad($("#touch"));
+const touch = new TouchControls($("#touch"));
 const auto = new Autoplay();
 auto.enabled = settings.auto || params.has("auto");
-const driver = new Driver(new CombinedInput(kb, touch, auto));
+const input = new CombinedInput(kb, touch, auto);
+const driver = new Driver(input);
 const isTouch = matchMedia("(pointer: coarse)").matches || params.has("touch");
+const renderer = new Renderer($("#game"), driver, () => settings);
+input.screenToFloor = renderer.screenToFloor;
+input.me = () => { if (driver.mode === "attract") return null; const f = driver.state.f[driver.mode === "online" ? driver.me : 0]; return { x: f.x, y: f.y }; };
+renderer.aim = () => input.preview;
+renderer.hud.touchMode = isTouch;
+renderer.hud.touchButtons = touch.skillButtons;
 
 function simLoop() { driver.update(); requestAnimationFrame(simLoop); }
 requestAnimationFrame(simLoop);
 setInterval(() => driver.update(), 8);
-
-let game: Phaser.Game | null = null;
-const integerZoom = () => Math.max(1, Math.floor(Math.min(innerWidth / C.W, innerHeight / C.H)));
-async function bootPhaser() {
-  try { await Promise.race([document.fonts.load('8px "Press Start 2P"'), new Promise((r) => setTimeout(r, 1500))]); } catch { /* fallback font */ }
-  const integer = settings.scaling === "integer";
-  game = new Phaser.Game({
-    type: Phaser.AUTO, parent: "game", width: C.W, height: C.H, pixelArt: true, backgroundColor: "#05060a",
-    scale: integer ? { mode: Phaser.Scale.NONE, zoom: integerZoom(), autoCenter: Phaser.Scale.CENTER_BOTH } : { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [new GameScene(driver, () => settings)],
-  });
-}
-bootPhaser();
-addEventListener("resize", () => { if (game && settings.scaling === "integer") (game.scale as unknown as { setZoom(z: number): void }).setZoom(integerZoom()); });
+function drawLoop() { renderer.frame(); requestAnimationFrame(drawLoop); }
+requestAnimationFrame(drawLoop);
 
 function applyLook() {
   document.documentElement.classList.toggle("big", settings.bigText);
-  $("#crt").hidden = !settings.crt;
   const t = settings.touch, tp = $("#touch");
   tp.classList.toggle("lefty", t.leftHanded);
   tp.style.opacity = String(t.opacity / 100);
-  $("#pad-move").style.transform = `translate(${t.lx}px, ${t.ly}px) scale(${t.size / 100})`;
   $("#pad-act").style.transform = `translate(${t.rx}px, ${t.ry}px) scale(${t.size / 100})`;
 }
 applyLook();
@@ -120,8 +113,7 @@ function showDesktop() {
     <div class="icons">
       ${icon("i-cpu", "VS", "Vs CPU")}
       ${icon("i-online", "@", "Online", "lobby codes")}
-      ${icon("i-career", "▲", "Career", "phase 8", true)}
-      ${icon("i-sandbox", "◇", "Sandbox", "phase 8", true)}
+      ${icon("i-ladder", "▲", "Ladder", "coming soon", true)}
       ${icon("i-swag", "★", "Swag Drawer")}
       ${icon("i-cp", "⚙", "Control Panel")}
     </div>
@@ -138,50 +130,50 @@ setInterval(tickClock, 15000);
 
 // ---------- Employee Directory ----------
 type PickMode = "practice" | "host" | "guest";
-interface Pick { job: number; set: number; palette: number }
+interface Pick { job: number; palette: number }
 let dirReady: ((p: Pick) => void) | null = null;
+const playable = (k: number) => implementedJobs().includes(k);
 
-function statsHtml(k: number) {
-  const m = META[k], names = ["SPD", "RNG", "WGT", "CHG"];
-  return `<dl class="stats">${m.stats.map((v, n) => `<dt>${names[n]}</dt><dd>${[1, 2, 3, 4, 5].map((p) => `<span class="pip${p <= v ? " on" : ""}"></span>`).join("")}</dd>`).join("")}</dl>`;
+/** One kit as a card: passive and the three skills, one short line each. */
+function kitCardHtml(k: number) {
+  const kit = KITS[k], g = SKILL_GLYPHS[k] ?? ["1", "2", "3"];
+  const keys = [settings.keys.s1[0], settings.keys.s2[0], settings.keys.s3[0]].map((c) => keyLabel(c ?? ""));
+  return `<div class="kit">
+    <div class="sk pas"><b class="gl">◆</b><span><b>${esc(kit.passive.name)}</b> ${esc(kit.passive.text)}</span></div>
+    ${kit.skills.map((sk, n) => `<div class="sk"><b class="gl">${esc(g[n])}</b><span><b>${esc(sk.name)}</b> ${esc(sk.text)}</span><small>${isTouch ? `S${n + 1}` : keys[n]} · ${sk.cost / 100} · ${sk.cd / 60}s</small></div>`).join("")}
+  </div>`;
 }
-function setCardHtml(k: number, set: number, pressed: boolean) {
-  const st = JOBS[k]!.sets[set];
-  return `<button class="setcard" data-set="${set}" aria-pressed="${pressed}"><h4>SET ${"AB"[set]}: "${esc(st.name)}"</h4><span class="pas">◆ ${esc(st.passive)}: ${esc(st.passiveDesc)}</span>` +
-    st.skills.map((sk, n) => `<span class="sk">${"UIO"[n]} · ${esc(sk.name)}${sk.aim ? " (aim)" : ""} (${sk.cost / 100}${sk.tok ? ` + ${sk.tok / 100} tok` : ""} / ${sk.cd / 60}s): ${esc(sk.desc)}</span>`).join("") +
-    `<span class="sk"><i>${esc(st.combo)}</i></span></button>`;
-}
+
 function openDirectory(mode: PickMode, ready?: (p: Pick) => void) {
   dirReady = ready ?? null;
   closeTo = mode === "practice" ? () => showDesktop() : () => { leaveOnline(); showDesktop(); };
+  if (!playable(settings.job)) settings.job = implementedJobs()[0];
+  if (settings.cpu >= 0 && !playable(settings.cpu)) settings.cpu = -1;
   let random = false;
   const render = () => {
-    const k = settings.job, j = JOBS[k]!, m = META[k];
+    const k = settings.job, kit = KITS[k], m = META[k];
     const opp = mode === "practice"
-      ? (settings.cpu >= 0 ? `<div class="sprite"><img class="body flip" src="${fullBodyIcon(settings.cpu)}" alt=""></div><p class="jobname">${esc(JOB_NAMES[settings.cpu])}</p>` : `<div class="sprite"><div class="mystery">?</div></div><p class="muted">Random CPU</p>`)
+      ? (settings.cpu >= 0 ? `<div class="sprite"><img class="body" src="${renderer.portrait(settings.cpu, 1)}" alt=""></div><p class="jobname">${esc(KITS[settings.cpu].name)}</p>` : `<div class="sprite"><div class="mystery">?</div></div><p class="muted">Random CPU</p>`)
       : `<div class="sprite"><div class="mystery">?</div></div><p class="muted" id="opp-st">${net?.theirs ? "READY" : "choosing…"}</p><p class="muted">${esc(net?.them ?? "")}</p>`;
     const optsHtml = mode === "guest" ? "" : `<div class="row opts">
         <label>Arena <select id="o-arena">${ARENAS.map((a, n) => `<option value="${n}" ${n === settings.arena ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label>
-        ${mode === "practice" ? `<label>CPU <select id="o-cpu"><option value="-1">Random</option>${implementedJobs().map((n) => `<option value="${n}" ${n === settings.cpu ? "selected" : ""}>${esc(JOB_NAMES[n])}</option>`).join("")}</select></label>
+        ${mode === "practice" ? `<label>CPU <select id="o-cpu"><option value="-1">Random</option>${implementedJobs().map((n) => `<option value="${n}" ${n === settings.cpu ? "selected" : ""}>${esc(KITS[n].name)}</option>`).join("")}</select></label>
         <label>Difficulty <select id="o-lvl">${LEVELS.map((l, n) => `<option value="${n + 1}" ${n + 1 === settings.cpuLevel ? "selected" : ""}>${n + 1} · ${l.name}</option>`).join("")}</select></label>` : ""}
-        <label><input type="checkbox" id="o-items" ${settings.items ? "checked" : ""}> Items</label>
-        <label><input type="checkbox" id="o-haz" ${settings.hazards ? "checked" : ""}> Hazards</label>
       </div>`;
     const root = screen("dir", win("EMPLOYEE DIRECTORY", `
       <div class="dir">
         <div class="side"><h4>YOU · ${esc(settings.name)}</h4>
           ${random ? `<div class="sprite"><div class="mystery">?</div></div><p class="jobname">RANDOM</p>` :
-          `<div class="sprite"><img class="body" src="${fullBodyIcon(k, settings.palette)}" alt=""></div>
-          <p class="jobname">${esc(j.name)}</p><p class="muted">"${esc(m.tag)}" · ${esc(m.arch)} · ${"★".repeat(m.diff)}${"☆".repeat(4 - m.diff)}</p>
-          ${statsHtml(k)}<p class="muted">${esc(m.weapon)} · charge ${(j.chargeFull / 60).toFixed(1)} s · ${j.tap}/${j.full}</p>`}
+          `<div class="sprite"><img class="body" src="${renderer.portrait(k, settings.palette)}" alt=""></div>
+          <p class="jobname">${esc(kit.name)}</p><p class="muted">${esc(kit.role)} · ${kit.ranged ? "Ranged" : "Melee"} · Speed ${"●".repeat(kit.speed)}</p>`}
         </div>
         <div style="display:grid;gap:10px;min-width:0">
           <div class="pickgrid" role="listbox" aria-label="Jobs">
-            ${JOB_NAMES.map((n, idx) => `<button data-job="${idx}" title="${esc(n)}" aria-label="${esc(n)}" aria-selected="${!random && idx === k}" style="background:${hex(JOBS[idx]!.color)}"><img src="${faceIcon(idx, 0, hex(JOBS[idx]!.color))}" alt=""><span>${JOB_CODES[idx]}</span></button>`).join("")}
-            <button class="rand" data-job="-1" aria-selected="${random}" title="Random job, set and palette">?</button>
+            ${KITS.map((j, idx) => { const ok = playable(idx); return `<button data-job="${idx}" title="${esc(j.name)}${ok ? "" : " (coming soon)"}" aria-label="${esc(j.name)}" aria-selected="${!random && idx === k}" ${ok ? "" : "disabled"} style="background:${JOB_COLORS[idx]}"><img src="${renderer.portrait(idx, 0)}" alt=""><span>${JOB_CODES[idx]}</span>${ok ? "" : `<i class="soon">SOON</i>`}</button>`; }).join("")}
+            <button class="rand" data-job="-1" aria-selected="${random}" title="Random job">?</button>
           </div>
-          ${random ? `<p class="muted">Job, set and palette are picked at random and revealed on the VS screen.</p>` : `<div class="sets">${setCardHtml(k, 0, settings.set === 0)}${setCardHtml(k, 1, settings.set === 1)}</div>
-          <div class="pals">${PALETTES.map((p, n) => `<button data-pal="${n}" aria-pressed="${n === settings.palette}" ${paletteUnlocked(n) ? "" : "disabled title='Unlocks in Career'"}><i style="background:${hex(paletteColor(j.color, n))}"></i>${p}${paletteUnlocked(n) ? "" : " 🔒"}</button>`).join("")}</div>`}
+          ${random ? `<p class="muted">Your job is picked at random and shown on the VS screen.</p>` : `<p class="muted">"${esc(m.tag)}"</p>${kitCardHtml(k)}
+          <div class="pals">${["Main", "Alt"].map((p, n) => `<button data-pal="${n}" aria-pressed="${n === settings.palette}">${p}</button>`).join("")}</div>`}
           ${optsHtml}
           <div class="row"><button class="btn primary" id="ready">READY</button><span class="status" id="dir-st">${mode === "practice" ? "" : "Your pick stays hidden until you're both ready."}</span></div>
         </div>
@@ -189,22 +181,17 @@ function openDirectory(mode: PickMode, ready?: (p: Pick) => void) {
       </div>`, true));
     root.querySelectorAll<HTMLElement>("[data-job]").forEach((b) => b.addEventListener("click", () => {
       const n = Number(b.dataset.job);
-      if (n < 0) random = true; else { random = false; if (n !== settings.job) { settings.job = n; settings.set = 0; } }
+      if (n < 0) random = true; else if (playable(n)) { random = false; settings.job = n; }
       save(); render();
     }));
-    root.querySelectorAll<HTMLElement>("[data-set]").forEach((b) => b.addEventListener("click", () => { settings.set = Number(b.dataset.set); save(); render(); }));
     root.querySelectorAll<HTMLElement>("[data-pal]").forEach((b) => b.addEventListener("click", () => { settings.palette = Number(b.dataset.pal); save(); render(); }));
     const sel = (id: string) => root.querySelector<HTMLSelectElement>(id);
     sel("#o-arena")?.addEventListener("change", (e) => { settings.arena = Number((e.target as HTMLSelectElement).value); save(); });
     sel("#o-cpu")?.addEventListener("change", (e) => { settings.cpu = Number((e.target as HTMLSelectElement).value); save(); render(); });
     sel("#o-lvl")?.addEventListener("change", (e) => { settings.cpuLevel = Number((e.target as HTMLSelectElement).value); save(); });
-    root.querySelector<HTMLInputElement>("#o-items")?.addEventListener("change", (e) => { settings.items = (e.target as HTMLInputElement).checked; save(); });
-    root.querySelector<HTMLInputElement>("#o-haz")?.addEventListener("change", (e) => { settings.hazards = (e.target as HTMLInputElement).checked; save(); });
     $("#ready", root).addEventListener("click", () => {
       const jobs = implementedJobs();
-      const p: Pick = random
-        ? { job: jobs[Math.floor(Math.random() * jobs.length)], set: Math.floor(Math.random() * 2), palette: Math.floor(Math.random() * 2) }
-        : { job: settings.job, set: settings.set, palette: settings.palette };
+      const p: Pick = random ? { job: jobs[Math.floor(Math.random() * jobs.length)], palette: Math.floor(Math.random() * 2) } : { job: settings.job, palette: settings.palette };
       if (mode === "practice") startPractice(p);
       else { ($("#ready", root) as HTMLButtonElement).disabled = true; $("#dir-st", root).textContent = "Ready. Waiting for your opponent…"; dirReady?.(p); }
     });
@@ -215,8 +202,8 @@ function openDirectory(mode: PickMode, ready?: (p: Pick) => void) {
 
 function startPractice(p: Pick) {
   const jobs = implementedJobs();
-  const cj = settings.cpu >= 0 ? settings.cpu : jobs[Math.floor(Math.random() * jobs.length)];
-  const cfg: MatchConfig = { ...DEFAULT_CONFIG, jobs: [p.job, cj], sets: [p.set, Math.floor(Math.random() * 2)], arena: settings.arena, items: settings.items, hazards: settings.hazards, seed: (Math.random() * 2 ** 31) | 0 };
+  const cj = settings.cpu >= 0 && playable(settings.cpu) ? settings.cpu : jobs[Math.floor(Math.random() * jobs.length)];
+  const cfg: MatchConfig = { jobs: [p.job, cj], arena: settings.arena % ARENAS.length, seed: (Math.random() * 2 ** 31) | 0 };
   const cpuPal = cj === p.job && p.palette === 0 ? 1 : 0;
   lastPractice = p;
   const cpuName = `CPU · ${LEVELS[settings.cpuLevel - 1].name}`;
@@ -230,10 +217,7 @@ let lastPractice: Pick | null = null;
 
 // ---------- VS screen ----------
 function showVS(cfg: MatchConfig, names: [string, string], pals: [number, number], then: () => void) {
-  const side = (i: 0 | 1) => {
-    const j = JOBS[cfg.jobs[i]]!;
-    return `<div class="who"><img class="vsbody${i ? " flip" : ""}" src="${fullBodyIcon(cfg.jobs[i], pals[i])}" alt="" style="justify-self:${i ? "end" : "start"}">${esc(names[i] || `P${i + 1}`)}<small>${esc(j.name)} · Set ${"AB"[cfg.sets[i]]} "${esc(j.sets[cfg.sets[i]].name)}"</small></div>`;
-  };
+  const side = (i: 0 | 1) => `<div class="who"><img class="vsbody" src="${renderer.portrait(cfg.jobs[i], pals[i])}" alt="" style="justify-self:${i ? "end" : "start"}">${esc(names[i] || `P${i + 1}`)}<small>${esc(KITS[cfg.jobs[i]].name)}</small></div>`;
   ui.innerHTML = `<div class="vs" id="vs"><div class="half l">${side(0)}</div><div class="half r">${side(1)}</div><div class="bigvs">VS</div><div class="arena">${esc(ARENAS[cfg.arena].name.toUpperCase())}</div></div>`;
   onScreen = "vs";
   setPlaying(false);
@@ -251,7 +235,7 @@ addEventListener("keydown", (e) => { if (e.key === "Escape" && onScreen === "" &
 function showPause() {
   const online = driver.mode === "online";
   if (!online) driver.paused = true;
-  const s = driver.state, me = driver.me, f = s.f[me], st = JOBS[f.job]!.sets[f.set];
+  const f = driver.state.f[driver.me];
   closeTo = () => { driver.paused = false; playing(); };
   const root = screen("pause", win(online ? "MENU (THE MATCH KEEPS RUNNING)" : "PAUSED", `
     <div class="row">
@@ -259,9 +243,9 @@ function showPause() {
       <button class="btn" id="p-cp">CONTROL PANEL</button>
       <button class="btn" id="p-quit">${online ? "FORFEIT" : "QUIT TO DESKTOP"}</button>
     </div>
-    <h3 class="sec">MOVE LIST · ${esc(JOBS[f.job]!.name.toUpperCase())}</h3>
-    <div class="sets" style="grid-template-columns:1fr">${setCardHtml(f.job, f.set, true)}</div>
-    <p class="muted">Quirk: ${esc(META[f.job].weapon)}. ${esc(st.combo)}</p>`));
+    <h3 class="sec">${esc(KITS[f.job].name.toUpperCase())}</h3>
+    ${kitCardHtml(f.job)}
+    <p class="muted">Hold Attack to charge, release to swing. Dash to dodge. Skills auto-aim; ${isTouch ? "drag a skill button to aim it" : "the mouse aims them"}.</p>`));
   $("#p-resume", root)?.addEventListener("click", () => closeTo());
   $("#p-restart", root)?.addEventListener("click", () => { driver.paused = false; if (lastPractice) startPractice(lastPractice); });
   $("#p-cp", root).addEventListener("click", () => showControlPanel("controls", () => showPause()));
@@ -275,7 +259,7 @@ let confirmForfeit = false;
 setInterval(() => {
   const s = driver.state;
   if (driver.mode === "attract" || onScreen !== "" || postShown) return;
-  if (s.phase === PHASE_MATCH_END && s.phaseT <= 1) { postShown = true; showPost(); }
+  if (s.phase === PHASE_MATCH_END && s.phaseT <= 150) { postShown = true; showPost(); }
 }, 200);
 
 function showPost() {
@@ -283,12 +267,12 @@ function showPost() {
   const names = driver.view.names.map((n, i) => n || `P${i + 1}`);
   const w = s.matchWinner;
   const head = w === 2 ? "DRAW" : w === me ? "YOU WIN!" : `${names[w].toUpperCase()} WINS`;
-  const rows: [string, number][] = [["Damage dealt", ST.DMG], ["Longest combo", ST.MAX_COMBO], ["Burnouts", ST.BURNOUTS], ["Items grabbed", ST.ITEMS], ["Perfect rounds", ST.PERFECT]];
+  const rows: [string, number][] = [["Damage dealt", ST.DMG], ["Hits", ST.HITS], ["Longest combo", ST.MAX_COMBO], ["Skills used", ST.SKILLS], ["Burnouts", ST.BURNOUTS]];
   const online = driver.mode === "online";
   closeTo = () => { leaveOnline(); showDesktop(); };
   const root = screen("post", win("POST-MORTEM", `
     <p class="winner">${esc(head)}</p>
-    <p class="muted">${s.wins[0]} – ${s.wins[1]} · ${esc(ARENAS[s.cfg.arena].name)}${s.tiebreak ? " · decided by a Production Incident" : ""}</p>
+    <p class="muted">${s.wins[0]} – ${s.wins[1]} · ${esc(ARENAS[s.cfg.arena].name)}</p>
     <table class="pm"><thead><tr><th></th><th>${esc(names[0])} (${JOB_CODES[s.f[0].job]})</th><th>${esc(names[1])} (${JOB_CODES[s.f[1].job]})</th></tr></thead>
     <tbody>${rows.map(([label, k]) => `<tr><td>${label}</td><td>${s.stats[0][k]}</td><td>${s.stats[1][k]}</td></tr>`).join("")}</tbody></table>
     <div class="row">
@@ -346,7 +330,7 @@ function showMeetingRoom() {
         <p class="status" id="j-st" aria-live="polite"></p>
       </div>
     </div>
-    <p class="muted">Both players need to be online at the same time. Codes expire after 10 minutes. Netcode test settings are in Control Panel → Online.</p>`, true));
+    <p class="muted">Both players need to be online at the same time. Codes expire after 10 minutes.</p>`, true));
   $("#m-create", root).addEventListener("click", () => host(root));
   $("#j-go", root).addEventListener("click", () => join(($("#j-code", root) as HTMLInputElement).value, root));
   $("#j-code", root).addEventListener("keydown", (e) => { if ((e as KeyboardEvent).key === "Enter") join((e.target as HTMLInputElement).value, root); });
@@ -367,7 +351,7 @@ function makeLink(ice: RTCIceServer[], role: 0 | 1, onStatus: (t: string, err?: 
           openOnlinePick();
           break;
         case "pick":
-          if (JOBS[m.job] && (m.set === 0 || m.set === 1)) net.theirs = { job: m.job, set: m.set, palette: m.palette === 1 ? 1 : 0 };
+          if (playable(m.job)) net.theirs = { job: m.job, palette: m.palette === 1 ? 1 : 0 };
           { const el = document.getElementById("opp-st"); if (el) el.textContent = "READY"; }
           tryStart();
           break;
@@ -407,7 +391,7 @@ function openOnlinePick() {
 }
 function repickOnline() {
   if (!net) return;
-  const l = driver.keepLink(); void l;
+  driver.keepLink();
   driver.startAttract();
   net.theirs = undefined;
   openOnlinePick();
@@ -415,7 +399,7 @@ function repickOnline() {
 function hostConfig(): { cfg: MatchConfig; palettes: [number, number] } | null {
   if (!net || !net.mine || !net.theirs) return null;
   const a = net.mine, b = net.theirs;
-  const cfg: MatchConfig = { ...DEFAULT_CONFIG, jobs: [a.job, b.job], sets: [a.set, b.set], arena: settings.arena, items: settings.items, hazards: settings.hazards, seed: (Math.random() * 2 ** 31) | 0 };
+  const cfg: MatchConfig = { jobs: [a.job, b.job], arena: settings.arena % ARENAS.length, seed: (Math.random() * 2 ** 31) | 0 };
   const pals: [number, number] = [a.palette, a.job === b.job && a.palette === b.palette ? (b.palette + 1) % 2 : b.palette]; // mirror match
   return { cfg, palettes: pals };
 }
@@ -519,15 +503,17 @@ function showControlPanel(tab: CpTab = "controls", back?: () => void) {
   let body = "";
   switch (tab) {
     case "audio": body = `${rng("v-master", settings.vol.master, "Master")}${rng("v-music", settings.vol.music, "Music")}${rng("v-sfx", settings.vol.sfx, "SFX")}${rng("v-ann", settings.vol.announcer, "Announcer")}
-      ${chk("c-mono", settings.mono, "Mono audio")}${chk("c-muffle", settings.muffle, "Muffle music during my Burnout")}<p class="muted">Sound arrives in phase 7; these are saved now.</p>`; break;
-    case "controls": body = `<h3 class="sec">KEYBOARD</h3><div class="binds">${ACTIONS.map((a) => `<span>${a.label}</span><button data-bind="${a.id}" data-n="0">${esc(keyLabel(settings.keys[a.id][0] ?? "—"))}</button><button data-bind="${a.id}" data-n="1">${esc(keyLabel(settings.keys[a.id][1] ?? "—"))}</button>`).join("")}</div>
+      ${chk("c-mono", settings.mono, "Mono audio")}${chk("c-muffle", settings.muffle, "Muffle music during my Burnout")}<p class="muted">Sound arrives in phase R7; these are saved now.</p>`; break;
+    case "controls": body = `<h3 class="sec">MOUSE</h3>${chk("k-mouse", settings.mouseAim, "Aim with the mouse (left click attacks, right click dashes)")}
+      <h3 class="sec">KEYBOARD</h3><div class="binds">${ACTIONS.map((a) => `<span>${a.label}</span><button data-bind="${a.id}" data-n="0">${esc(keyLabel(settings.keys[a.id][0] ?? "—"))}</button><button data-bind="${a.id}" data-n="1">${esc(keyLabel(settings.keys[a.id][1] ?? "—"))}</button>`).join("")}</div>
       <div class="row"><button class="btn" id="k-reset">RESET KEYS</button></div>
+      <p class="muted">Gamepad: left stick moves, right stick aims, RT attacks, LT or A dashes, X / Y / B are skills 1-3.</p>
       <h3 class="sec">TOUCH</h3>${chk("t-lefty", settings.touch.leftHanded, "Left-handed (mirror)")}${rng("t-size", settings.touch.size, "Button size %", 70, 140)}${rng("t-op", settings.touch.opacity, "Button opacity %", 30, 100)}
-      <div class="row"><button class="btn" id="t-edit">EDIT TOUCH LAYOUT</button><button class="btn" id="t-reset">RESET LAYOUT</button></div>`; break;
-    case "gameplay": body = `${chk("g-dmg", settings.dmgNumbers, "Damage numbers")}${chk("g-shake", settings.shake, "Screen shake")}${chk("g-tips", settings.tips, "Contextual tips (Career)")}`; break;
-    case "display": body = `${sel("d-scale", settings.scaling, "Scaling", [["fit", "Fill screen"], ["integer", "Whole-number (sharpest)"]])}${chk("d-crt", settings.crt, "CRT scanline filter")}
-      <div class="row"><button class="btn" id="d-full">FULLSCREEN</button></div><p class="muted">Whole-number scaling applies after a reload.</p>`; break;
-    case "access": body = `${chk("a-flash", settings.reduceFlash, "Reduce flashing")}${chk("a-big", settings.bigText, "Larger UI text")}${chk("a-cb", settings.colorblind, "Colorblind-safe HP colors")}`; break;
+      <div class="row"><button class="btn" id="t-edit">MOVE BUTTONS</button><button class="btn" id="t-reset">RESET LAYOUT</button></div>`; break;
+    case "gameplay": body = `${chk("g-dmg", settings.dmgNumbers, "Damage numbers")}${chk("g-shake", settings.shake, "Screen shake")}${chk("g-tips", settings.tips, "Tips")}`; break;
+    case "display": body = `${sel("d-q", settings.quality, "Graphics", [["high", "High (shadows, sharper)"], ["low", "Low (faster on phones)"]])}
+      <div class="row"><button class="btn" id="d-full">FULLSCREEN</button></div><p class="muted">Graphics changes apply after a reload.</p>`; break;
+    case "access": body = `${chk("a-flash", settings.reduceFlash, "Reduce flashing")}${chk("a-big", settings.bigText, "Larger UI text")}${chk("a-cb", settings.colorblind, "Colorblind-safe colors (blue and orange)")}`; break;
     case "online": body = `<label><span>Name</span><input type="text" id="o-name" maxlength="16" value="${esc(settings.name)}"></label><p class="status" id="o-name-st"></p>
       ${sel("o-delay", settings.delay, "Input delay", [0, 1, 2, 3, 4].map((n) => [n, `${n} frame${n === 1 ? "" : "s"}`]))}
       ${chk("o-debug", settings.debug, "Show netcode stats")}
@@ -536,8 +522,8 @@ function showControlPanel(tab: CpTab = "controls", back?: () => void) {
       ${sel("o-jit", settings.jitter, "Jitter", [[0, "Off"], [10, "±10 ms"], [25, "±25 ms"], [50, "±50 ms"]])}
       ${sel("o-loss", settings.loss, "Packet loss", [[0, "0 %"], [2, "2 %"], [5, "5 %"], [10, "10 %"], [20, "20 %"]])}
       ${chk("o-relay", settings.relay, "Force TURN relay")}${chk("o-auto", settings.auto, "Autoplay (random inputs)")}`; break;
-    case "data": body = `<p class="muted">Your progress lives in this browser. Transfer by code or QR arrives in phase 9.</p>
-      <div class="row"><button class="btn" disabled>TRANSFER PROGRESS (PHASE 9)</button><button class="btn" id="x-reset">RESET SETTINGS</button></div><p class="status" id="x-st"></p>`; break;
+    case "data": body = `<p class="muted">Your progress lives in this browser. Transfer by code or QR arrives in phase R9.</p>
+      <div class="row"><button class="btn" disabled>TRANSFER PROGRESS (R9)</button><button class="btn" id="x-reset">RESET SETTINGS</button></div><p class="status" id="x-st"></p>`; break;
   }
   const root = screen("cp", win("CONTROL PANEL", `<div class="tabs" role="tablist">${tabs.map(([k, t]) => `<button role="tab" data-tab="${k}" aria-selected="${k === tab}">${t}</button>`).join("")}</div><div class="form">${body}</div>`, true));
   root.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => b.addEventListener("click", () => showControlPanel(b.dataset.tab as CpTab, back)));
@@ -545,9 +531,10 @@ function showControlPanel(tab: CpTab = "controls", back?: () => void) {
   on("#v-master", "input", (e) => (settings.vol.master = +e.value)); on("#v-music", "input", (e) => (settings.vol.music = +e.value));
   on("#v-sfx", "input", (e) => (settings.vol.sfx = +e.value)); on("#v-ann", "input", (e) => (settings.vol.announcer = +e.value));
   on("#c-mono", "change", (e) => (settings.mono = e.checked)); on("#c-muffle", "change", (e) => (settings.muffle = e.checked));
+  on("#k-mouse", "change", (e) => (settings.mouseAim = e.checked));
   on("#t-lefty", "change", (e) => (settings.touch.leftHanded = e.checked)); on("#t-size", "input", (e) => (settings.touch.size = +e.value)); on("#t-op", "input", (e) => (settings.touch.opacity = +e.value));
   on("#g-dmg", "change", (e) => (settings.dmgNumbers = e.checked)); on("#g-shake", "change", (e) => (settings.shake = e.checked)); on("#g-tips", "change", (e) => (settings.tips = e.checked));
-  on("#d-scale", "change", (e) => (settings.scaling = e.value as "fit" | "integer")); on("#d-crt", "change", (e) => (settings.crt = e.checked));
+  on("#d-q", "change", (e) => (settings.quality = e.value as "high" | "low"));
   on("#a-flash", "change", (e) => (settings.reduceFlash = e.checked)); on("#a-big", "change", (e) => (settings.bigText = e.checked)); on("#a-cb", "change", (e) => (settings.colorblind = e.checked));
   on("#o-delay", "change", (e) => (settings.delay = +e.value)); on("#o-debug", "change", (e) => (settings.debug = e.checked));
   on("#o-lag", "change", (e) => { settings.lag = +e.value; applyLag(); }); on("#o-jit", "change", (e) => { settings.jitter = +e.value; applyLag(); });
@@ -563,7 +550,6 @@ function showControlPanel(tab: CpTab = "controls", back?: () => void) {
     if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "SURE? CLICK AGAIN"; return; }
     settings = resetSettings(settings.name); kb.rebuild(); applyLook(); setSt(root, "#x-st", "Settings reset.");
   });
-  // key rebinding
   root.querySelectorAll<HTMLButtonElement>("[data-bind]").forEach((b) => b.addEventListener("click", () => {
     b.classList.add("wait"); b.textContent = "PRESS…";
     const handler = (e: KeyboardEvent) => {
@@ -586,18 +572,16 @@ function editTouch(done: () => void) {
   ui.innerHTML = ""; onScreen = "touch-edit";
   const tp = $("#touch");
   tp.hidden = false; tp.classList.add("editing"); touch.editing = true; $("#touch-edit").hidden = false;
-  const drag = (pad: HTMLElement, kx: "lx" | "rx", ky: "ly" | "ry") => {
-    pad.onpointerdown = (e) => {
-      const sx = e.clientX - settings.touch[kx], sy = e.clientY - settings.touch[ky];
-      pad.setPointerCapture(e.pointerId);
-      pad.onpointermove = (m) => { settings.touch[kx] = Math.round(m.clientX - sx); settings.touch[ky] = Math.round(m.clientY - sy); applyLook(); };
-      pad.onpointerup = () => { pad.onpointermove = null; save(); };
-    };
+  const pad = $("#pad-act");
+  pad.onpointerdown = (e) => {
+    const sx = e.clientX - settings.touch.rx, sy = e.clientY - settings.touch.ry;
+    pad.setPointerCapture(e.pointerId);
+    pad.onpointermove = (m) => { settings.touch.rx = Math.round(m.clientX - sx); settings.touch.ry = Math.round(m.clientY - sy); applyLook(); };
+    pad.onpointerup = () => { pad.onpointermove = null; save(); };
   };
-  drag($("#pad-move"), "lx", "ly"); drag($("#pad-act"), "rx", "ry");
   $("#touch-done").onclick = () => {
     tp.classList.remove("editing"); touch.editing = false; $("#touch-edit").hidden = true; tp.hidden = true;
-    $("#pad-move").onpointerdown = null; $("#pad-act").onpointerdown = null;
+    pad.onpointerdown = null;
     done();
   };
 }
@@ -607,16 +591,13 @@ function showSwag(tab: "profiles" | "titles" | "scores" = "profiles") {
   closeTo = () => showDesktop();
   let body = "";
   if (tab === "profiles") {
-    body = `<div class="profiles">${JOB_NAMES.map((n, k) => {
-      const m = META[k], j = JOBS[k]!;
-      const skills = j.sets.flatMap((s) => s.skills.map((x) => x.name)).slice(0, 4).join(", ");
-      return `<article class="profile"><header><img class="av" src="${faceIcon(k, 0, hex(j.color))}" alt=""><div><b>${esc(n)}</b><div class="muted">"${esc(m.tag)}" · ${esc(m.arch)}</div></div></header>
-        <span>${esc(m.persona)} · ${esc(m.hair)}. ${esc(m.outfit)}.</span>
-        <span class="muted">Skills: ${esc(skills)}…</span>
-        <span class="endorse">Endorsed by ${2 + ((k * 7) % 9)} ${esc(JOB_NAMES[(k + 5) % 17])}s</span>
-        <span class="muted">Signature: ${esc(m.emote)}</span></article>`;
+    body = `<div class="profiles">${KITS.map((j, k) => {
+      const m = META[k];
+      return `<article class="profile"><header><img class="av" src="${renderer.portrait(k, 0)}" alt="" style="background:${JOB_COLORS[k]}"><div><b>${esc(j.name)}</b><div class="muted">"${esc(m.tag)}" · ${esc(j.role)}</div></div></header>
+        <span>${esc(m.persona)}. ${esc(m.outfit)}.</span>
+        <span class="muted">Skills: ${esc(j.skills.map((s) => s.name).join(", "))}${playable(k) ? "" : " · coming soon"}</span></article>`;
     }).join("")}</div>`;
-  } else body = `<p class="muted">${tab === "titles" ? "Titles unlock by clearing Career (phases 8–9)." : "High scores arrive with Career (phase 8)."}</p>`;
+  } else body = `<p class="muted">${tab === "titles" ? "Titles unlock in the Ladder (R8–R9)." : "High scores arrive with the Ladder (R8)."}</p>`;
   const root = screen("swag", win("SWAG DRAWER", `<div class="tabs">${[["profiles", "EMPLOYEE PROFILES"], ["titles", "TITLES"], ["scores", "HIGH SCORES"]].map(([k, t]) => `<button data-tab="${k}" aria-selected="${k === tab}">${t}</button>`).join("")}</div>${body}`, true));
   root.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => b.addEventListener("click", () => showSwag(b.dataset.tab as "profiles")));
 }
@@ -649,7 +630,7 @@ setInterval(async () => {
 document.addEventListener("visibilitychange", () => { if (driver.mode === "practice") driver.paused = document.hidden || onScreen === "pause"; });
 
 // ---------- start ----------
-if (DEV) (window as unknown as { techken: unknown }).techken = { driver, game: () => game, settings: () => settings };
+if (DEV) (window as unknown as { techken: unknown }).techken = { driver, renderer, settings: () => settings };
 driver.startAttract();
 const boot = () => {
   const qp = params.get("code");

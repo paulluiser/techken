@@ -12,10 +12,10 @@ export type GameMsg = (
 
 export type CtrlMsg =
   | { t: "hello"; v: number; delay: number; name: string }
-  | { t: "pick"; job: number; set: number; palette: number }
+  | { t: "pick"; job: number; palette: number }
   | { t: "start"; cfg: MatchConfig; palettes: [number, number] }
   | { t: "rematch" }
   | { t: "repick" }
   | { t: "bye" };
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4; // v4: top-down sim, 21-bit inputs
