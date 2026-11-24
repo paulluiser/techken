@@ -4,3 +4,9 @@ dist
 .env
 .env.local
 .DS_Store
+
+# Claude Code Game Studios (local files)
+.claude/settings.local.json
+CLAUDE.local.md
+project.local.yaml
+production/session-state/
